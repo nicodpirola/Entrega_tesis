@@ -1,0 +1,24 @@
+{
+  "modelVersion": "1.0",
+  "projectName": "theremin_dual_core",
+  "platform": "X:\\Entrega_Tesis\\Vitis_Loop_\\platform\\export\\platform\\platform.xpfm",
+  "externalComponentRefs": [
+    "App",
+    "Loop_y_SD"
+  ],
+  "components": [],
+  "buildConfigurations": [
+    {
+      "id": "default",
+      "name": "Default",
+      "supportedTargets": [
+        "HW_EMU",
+        "HW"
+      ]
+    }
+  ],
+  "activeBuildConfigId": "default",
+  "hostMode": "x86",
+  "isDirty": true,
+  "applicationFlow": "EMBEDDED"
+}

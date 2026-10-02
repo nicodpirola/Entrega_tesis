@@ -1,0 +1,8 @@
+﻿//arch = zynq; split = false; format = BIN
+the_ROM_image:
+{
+	[bootloader]..\platform\export\platform\sw\boot\fsbl.elf
+	..\theremin_dual_core\_ide\bitstream\design_1_wrapper.bit
+	..\App\build\App.elf
+	..\Loop_y_SD\build\Loop_y_SD.elf
+}

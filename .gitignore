@@ -1,0 +1,74 @@
+# --- No versionar (pedido explícito) ---
+Passthrough_v1.rar
+artyz7-theremin-display-encoders/
+Documentacion
+
+# Vivado / Xilinx: artefactos regenerables
+*.jou
+*.log
+*.str
+*.dmp
+*.tmp
+*.pid
+*.swp
+*~
+.webtalk/
+webtalk*.html
+webtalk*.jou
+webtalk*.log
+
+**/.Xil/
+**/*.cache/
+**/*.runs/
+**/*.sim/
+**/*.hw/
+**/*.ioplan/
+
+# Bitstream, checkpoint, informes grandes
+*.bit
+*.bin
+*.mcs
+*.rbd
+*.dcp
+*.edf
+*.rpt
+*.rpx
+*.ltx
+
+# Simulación (restos fuera de .sim)
+xelab.pb
+xvlog.pb
+xvhdl.pb
+
+**/ip_cache/
+**/ip_user_files/mem_init_files/
+
+# Vitis / Eclipse
+.metadata/
+RemoteSystemsTempFiles/
+**/Debug/
+**/Release/
+*.o
+*.a
+*.elf
+*.map
+*.pdi
+*.xo
+.vitisWorkspace.json
+_ide/logs/
+_ide/.wsdata/
+
+# Python (si agregás scripts)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE (opcional: quitá .vscode/ si querés versionar ajustes del equipo)
+.idea/
+.vscode/

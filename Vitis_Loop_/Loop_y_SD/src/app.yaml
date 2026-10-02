@@ -1,0 +1,4 @@
+domain_path: X:\Entrega_Tesis\Vitis_Loop_\platform\export\platform\sw\CORE1
+app_src_dir: X:\Xilinx\2025.1\Vitis\data\embeddedsw\lib\sw_apps\empty_application
+template: empty_application
+lang: c

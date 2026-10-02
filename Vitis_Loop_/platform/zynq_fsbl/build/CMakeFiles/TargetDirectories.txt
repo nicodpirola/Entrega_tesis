@@ -1,0 +1,3 @@
+X:/Entrega_Tesis/Vitis_Loop_/platform/zynq_fsbl/build/CMakeFiles/fsbl.elf.dir
+X:/Entrega_Tesis/Vitis_Loop_/platform/zynq_fsbl/build/CMakeFiles/edit_cache.dir
+X:/Entrega_Tesis/Vitis_Loop_/platform/zynq_fsbl/build/CMakeFiles/rebuild_cache.dir

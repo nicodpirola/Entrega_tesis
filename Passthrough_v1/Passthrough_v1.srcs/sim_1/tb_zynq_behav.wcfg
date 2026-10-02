@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="tb_zynq_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="axi_datamover_pkg" />
+            <top_module name="axi_dma_pkg" />
+            <top_module name="axi_vip_pkg" />
+            <top_module name="glbl" />
+            <top_module name="ipif_pkg" />
+            <top_module name="std" />
+            <top_module name="tb_zynq" />
+            <top_module name="vcomponents" />
+            <top_module name="xil_common_vip_pkg" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="469.434060 us"></ZoomStartTime>
+      <ZoomEndTime time="830.934061 us"></ZoomEndTime>
+      <Cursor1Time time="584.434060 us"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="250"></NameColumnWidth>
+      <ValueColumnWidth column_width="58"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="52" />
+   <wvobject fp_name="/tb_zynq/DDR_addr" type="array">
+      <obj_property name="ElementShortName">DDR_addr[14:0]</obj_property>
+      <obj_property name="ObjectShortName">DDR_addr[14:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_ba" type="array">
+      <obj_property name="ElementShortName">DDR_ba[2:0]</obj_property>
+      <obj_property name="ObjectShortName">DDR_ba[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_cas_n" type="logic">
+      <obj_property name="ElementShortName">DDR_cas_n</obj_property>
+      <obj_property name="ObjectShortName">DDR_cas_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_ck_n" type="logic">
+      <obj_property name="ElementShortName">DDR_ck_n</obj_property>
+      <obj_property name="ObjectShortName">DDR_ck_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_ck_p" type="logic">
+      <obj_property name="ElementShortName">DDR_ck_p</obj_property>
+      <obj_property name="ObjectShortName">DDR_ck_p</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_cke" type="logic">
+      <obj_property name="ElementShortName">DDR_cke</obj_property>
+      <obj_property name="ObjectShortName">DDR_cke</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_cs_n" type="logic">
+      <obj_property name="ElementShortName">DDR_cs_n</obj_property>
+      <obj_property name="ObjectShortName">DDR_cs_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_dm" type="array">
+      <obj_property name="ElementShortName">DDR_dm[3:0]</obj_property>
+      <obj_property name="ObjectShortName">DDR_dm[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_dq" type="array">
+      <obj_property name="ElementShortName">DDR_dq[31:0]</obj_property>
+      <obj_property name="ObjectShortName">DDR_dq[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_dqs_n" type="array">
+      <obj_property name="ElementShortName">DDR_dqs_n[3:0]</obj_property>
+      <obj_property name="ObjectShortName">DDR_dqs_n[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_dqs_p" type="array">
+      <obj_property name="ElementShortName">DDR_dqs_p[3:0]</obj_property>
+      <obj_property name="ObjectShortName">DDR_dqs_p[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_odt" type="logic">
+      <obj_property name="ElementShortName">DDR_odt</obj_property>
+      <obj_property name="ObjectShortName">DDR_odt</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_ras_n" type="logic">
+      <obj_property name="ElementShortName">DDR_ras_n</obj_property>
+      <obj_property name="ObjectShortName">DDR_ras_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_reset_n" type="logic">
+      <obj_property name="ElementShortName">DDR_reset_n</obj_property>
+      <obj_property name="ObjectShortName">DDR_reset_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/DDR_we_n" type="logic">
+      <obj_property name="ElementShortName">DDR_we_n</obj_property>
+      <obj_property name="ObjectShortName">DDR_we_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/FIXED_IO_ddr_vrn" type="logic">
+      <obj_property name="ElementShortName">FIXED_IO_ddr_vrn</obj_property>
+      <obj_property name="ObjectShortName">FIXED_IO_ddr_vrn</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/FIXED_IO_ddr_vrp" type="logic">
+      <obj_property name="ElementShortName">FIXED_IO_ddr_vrp</obj_property>
+      <obj_property name="ObjectShortName">FIXED_IO_ddr_vrp</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/FIXED_IO_mio" type="array">
+      <obj_property name="ElementShortName">FIXED_IO_mio[53:0]</obj_property>
+      <obj_property name="ObjectShortName">FIXED_IO_mio[53:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/FIXED_IO_ps_clk" type="logic">
+      <obj_property name="ElementShortName">FIXED_IO_ps_clk</obj_property>
+      <obj_property name="ObjectShortName">FIXED_IO_ps_clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/FIXED_IO_ps_porb" type="logic">
+      <obj_property name="ElementShortName">FIXED_IO_ps_porb</obj_property>
+      <obj_property name="ObjectShortName">FIXED_IO_ps_porb</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/FIXED_IO_ps_srstb" type="logic">
+      <obj_property name="ElementShortName">FIXED_IO_ps_srstb</obj_property>
+      <obj_property name="ObjectShortName">FIXED_IO_ps_srstb</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/ps_clk_generator" type="logic">
+      <obj_property name="ElementShortName">ps_clk_generator</obj_property>
+      <obj_property name="ObjectShortName">ps_clk_generator</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/ps_porb_generator" type="logic">
+      <obj_property name="ElementShortName">ps_porb_generator</obj_property>
+      <obj_property name="ObjectShortName">ps_porb_generator</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/ps_srstb_generator" type="logic">
+      <obj_property name="ElementShortName">ps_srstb_generator</obj_property>
+      <obj_property name="ObjectShortName">ps_srstb_generator</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/sys_clock" type="logic">
+      <obj_property name="ElementShortName">sys_clock</obj_property>
+      <obj_property name="ObjectShortName">sys_clock</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/sclk_out_0" type="logic">
+      <obj_property name="ElementShortName">sclk_out_0</obj_property>
+      <obj_property name="ObjectShortName">sclk_out_0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/lrclk_out_0" type="logic">
+      <obj_property name="ElementShortName">lrclk_out_0</obj_property>
+      <obj_property name="ObjectShortName">lrclk_out_0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/sclk_out_1" type="logic">
+      <obj_property name="ElementShortName">sclk_out_1</obj_property>
+      <obj_property name="ObjectShortName">sclk_out_1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/lrclk_out_1" type="logic">
+      <obj_property name="ElementShortName">lrclk_out_1</obj_property>
+      <obj_property name="ObjectShortName">lrclk_out_1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/mclk_out_adc" type="logic">
+      <obj_property name="ElementShortName">mclk_out_adc</obj_property>
+      <obj_property name="ObjectShortName">mclk_out_adc</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/mclk_out_dac" type="logic">
+      <obj_property name="ElementShortName">mclk_out_dac</obj_property>
+      <obj_property name="ObjectShortName">mclk_out_dac</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/clk_wiz_0/clk_aud" type="logic">
+      <obj_property name="ElementShortName">clk_aud</obj_property>
+      <obj_property name="ObjectShortName">clk_aud</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/sdata_0_out_0" type="logic">
+      <obj_property name="ElementShortName">sdata_0_out_0</obj_property>
+      <obj_property name="ObjectShortName">sdata_0_out_0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/resp" type="array">
+      <obj_property name="ElementShortName">resp[1:0]</obj_property>
+      <obj_property name="ObjectShortName">resp[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/read_data" type="array">
+      <obj_property name="ElementShortName">read_data[31:0]</obj_property>
+      <obj_property name="ObjectShortName">read_data[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/shift_reg" type="array">
+      <obj_property name="ElementShortName">shift_reg[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shift_reg[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/processing_system7_0/inst/M_AXI_GP0/master/IF/PC/WDATA" type="array">
+      <obj_property name="ElementShortName">WDATA[31:0]</obj_property>
+      <obj_property name="ObjectShortName">WDATA[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/i2s_transmitter_0/s_axi_ctrl_wdata" type="array">
+      <obj_property name="ElementShortName">s_axi_ctrl_wdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">s_axi_ctrl_wdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/left_sample" type="array">
+      <obj_property name="ElementShortName">left_sample[23:0]</obj_property>
+      <obj_property name="ObjectShortName">left_sample[23:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/right_sample" type="array">
+      <obj_property name="ElementShortName">right_sample[23:0]</obj_property>
+      <obj_property name="ObjectShortName">right_sample[23:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/i2s_receiver_0/m_axis_aud_tvalid" type="logic">
+      <obj_property name="ElementShortName">m_axis_aud_tvalid</obj_property>
+      <obj_property name="ObjectShortName">m_axis_aud_tvalid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/sdata_0_in_0" type="logic">
+      <obj_property name="ElementShortName">sdata_0_in_0</obj_property>
+      <obj_property name="ObjectShortName">sdata_0_in_0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/i2s_receiver_0/m_axis_aud_tdata" type="array">
+      <obj_property name="ElementShortName">m_axis_aud_tdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">m_axis_aud_tdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/i2s_receiver_0/m_axis_aud_tvalid" type="logic">
+      <obj_property name="ElementShortName">m_axis_aud_tvalid</obj_property>
+      <obj_property name="ObjectShortName">m_axis_aud_tvalid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/i2s_receiver_0/m_axis_aud_tready" type="logic">
+      <obj_property name="ElementShortName">m_axis_aud_tready</obj_property>
+      <obj_property name="ObjectShortName">m_axis_aud_tready</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/axi_stream_looper_mi_0/s1_axis_tdata" type="array">
+      <obj_property name="ElementShortName">s1_axis_tdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">s1_axis_tdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/axi_stream_looper_mi_0/m_i2s_axis_tdata" type="array">
+      <obj_property name="ElementShortName">m_i2s_axis_tdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">m_i2s_axis_tdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/axi_dma_0/s_axis_s2mm_tdata" type="array">
+      <obj_property name="ElementShortName">s_axis_s2mm_tdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">s_axis_s2mm_tdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/axi_dma_0/m_axi_s2mm_wdata" type="array">
+      <obj_property name="ElementShortName">m_axi_s2mm_wdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">m_axi_s2mm_wdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/axi_dma_0/m_axi_mm2s_rdata" type="array">
+      <obj_property name="ElementShortName">m_axi_mm2s_rdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">m_axi_mm2s_rdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/axi_dma_0/m_axis_mm2s_tdata" type="array">
+      <obj_property name="ElementShortName">m_axis_mm2s_tdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">m_axis_mm2s_tdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_zynq/dut/design_1_i/i2s_transmitter_0/s_axis_aud_tdata" type="array">
+      <obj_property name="ElementShortName">s_axis_aud_tdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">s_axis_aud_tdata[31:0]</obj_property>
+   </wvobject>
+</wave_config>
