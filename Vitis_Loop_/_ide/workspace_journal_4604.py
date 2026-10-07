@@ -1,4 +1,4 @@
-# 2026-10-01T23:05:49.869668
+# 2026-09-30T20:10:09.522732900
 import vitis
 
 client = vitis.create_client()
@@ -7,12 +7,16 @@ client.set_workspace(path="Vitis_Loop_")
 platform = client.get_component(name="platform")
 status = platform.build()
 
-comp = client.get_component(name="Loop_y_SD")
+comp = client.get_component(name="App")
 comp.build()
 
 status = platform.build()
 
-comp = client.get_component(name="App")
+comp.build()
+
+status = platform.build()
+
+comp = client.get_component(name="Loop_y_SD")
 comp.build()
 
 proj = client.get_sys_project(name="theremin_dual_core")

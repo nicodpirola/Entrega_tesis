@@ -202,3 +202,13 @@ void ili9341_flush_region(u16 x1, u16 y1, u16 x2, u16 y2, const u8 *data){
     spi_send(data, size);
     cs_high();
 }
+
+void ili9341_test_pattern(void) {
+    const u16 half_w = ILI9341_WIDTH / 2;
+    const u16 half_h = ILI9341_HEIGHT / 2;
+
+    ili9341_fill_rect(0,      0,      half_w, half_h, COLOR_RED);
+    ili9341_fill_rect(half_w, 0,      half_w, half_h, COLOR_GREEN);
+    ili9341_fill_rect(0,      half_h, half_w, half_h, COLOR_BLUE);
+    ili9341_fill_rect(half_w, half_h, half_w, half_h, COLOR_WHITE);
+}
