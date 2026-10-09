@@ -1,142 +1,205 @@
-// -----------------------------------------------------------------------------
-// fx_tremolo.sv   (modulacion de amplitud con LFO triangular)
-//
-//   out = x * gain(t)
-//   gain(t) = 1 - depth*(1+lfo)/2      con lfo en [-1,+1]
-//     depth=0 -> gain=1 (sin tremolo)
-//     depth=1 -> gain va de 1 a 0 (tremolo total, se calla en los valles)
-//
-// FSM (4 estados, 1 mul principal):
-//   ST_IDLE : acepta x, snapshot LFO
-//   ST_GAIN : calcula gain_q (unipolar) a partir de lfo y depth
-//   ST_MUL  : out = x * gain
-//   ST_OUT  : emite
-//
-// Formato: x en Q3.29, depth/gain en Q1.31, mul con mul_aud_q31.
-// -----------------------------------------------------------------------------
-module fx_tremolo (
-  input  logic               clk,
-  input  logic               rst_n,
-  input  logic               enable,
+//! @title Efecto Tremolo
+//! @file fx_tremolo.sv
+//! @author [Matias Repila / Nicolas Pirola]
+//! @brief Modulación de amplitud.
+//!
+//! @details
+//! Ecuación Matemática:
+//!
+//! Salida = Audio * Gain(t)
+//!
+//! Gain(t) = 1.0 - Depth * ((LFO / 2) + 0.5)
+//!
+//! Arquitectura:
+//! Se utiliza una FSM para multiplexar en el tiempo un unico multiplicador de 32x32 bits
+//! (4 bloques DSP48).
 
-  input  logic               in_valid,
-  output logic               in_ready,
-  input  logic signed [31:0] in_data,
+module fx_tremolo(
+    input logic                clk              , //! Clock
+    input logic                rst_n            , //! Reset
+    input logic                enable           , //! Enable efecto
 
-  output logic               out_valid,
-  input  logic               out_ready,
-  output logic signed [31:0] out_data,
+    output logic               in_ready        ,
+    input  logic               in_valid         ,
+    input  logic signed [31:0] in_data          ,  //! Formato Q3.29
 
-  input  logic signed [31:0] depth_q1_31,       // profundidad 0..1
-  input  logic [31:0]        lfo_phase_inc_u32  // velocidad
+    output logic               out_valid        ,
+    input  logic               out_ready        ,
+    output logic signed[31:0]  out_data         , //! Formato Q3.29
+
+    input logic signed[31:0]   depth_q1_31      , //! Profundidad del LFO (PS)
+    input logic [31:0]         lfo_phase_inc_u32 //! Rate (PS)
 );
 
-  import fx_dsp_pkg::*;
+    import fx_dsp_pkg::*;
 
-  // Output buffer
-  logic               out_buf_valid;
-  logic signed [31:0] out_buf;
-  assign out_valid = out_buf_valid;
-  assign out_data  = out_buf;
-  wire out_fire = out_valid && out_ready;
+    //parametros
+    localparam logic signed [31:0] UNO_Q1_31 = 32'sh7FFF_FFFF;
 
-  // LFO
-  logic signed [31:0] lfo_q1_31;
-  logic               lfo_tick, lfo_clear;
-  fx_lfo_tri u_lfo (
-    .clk(clk), .rst_n(rst_n), .tick(lfo_tick),
-    .phase_inc_u32(lfo_phase_inc_u32), .phase_clear(lfo_clear), .lfo_q1_31(lfo_q1_31)
-  );
+    //estados
+    typedef enum logic [2:0]{
+        ST_IDLE,
+        ST_LOAD_GAIN,
+        ST_MUL_GAIN,
+        ST_LOAD_AUDIO,
+        ST_MUL_AUDIO,
+        ST_SAVE_OUTPUT
+    } state_t;
 
-  // Enable rise
-  logic enable_d;
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) enable_d <= 1'b0;
-    else        enable_d <= enable;
-  end
-  wire enable_rise = enable && !enable_d;
+    state_t state; //! Maquina de estados
 
-  // FSM
-  typedef enum logic [1:0] {
-    ST_IDLE = 2'd0,
-    ST_GAIN = 2'd1,
-    ST_MUL  = 2'd2,
-    ST_OUT  = 2'd3
-  } state_t;
+    logic signed [31:0] sample_reg;
+    logic signed [31:0] depth_reg;
+    logic signed [31:0] lfo_reg;
 
-  state_t state;
-  logic signed [31:0] x_reg;
-  logic signed [31:0] lfo_r;
-  logic signed [31:0] gain_r;     // ganancia unipolar Q1.31
-  logic signed [31:0] out_r;
+    logic signed [31:0] mul_a_reg;
+    logic signed [31:0] mul_b_reg;
+    logic signed [63:0] mul_product_reg;
 
-  // Bypass
-  wire bypass_mode = (!enable);
-  wire can_accept = (state == ST_IDLE) && (!out_buf_valid);
-  assign in_ready = can_accept;
+    logic               out_buf_valid;
+    logic signed [31:0] out_buf;
+    logic               enable_d;
 
-  wire in_fire = in_valid && in_ready;
+    logic signed [31:0] depth_eff;
+    logic signed [31:0] half_lfo;
+    logic signed [31:0] mul_result;
+    logic signed [31:0] gain_next;
 
-  assign lfo_tick  = (!bypass_mode) && (state == ST_IDLE) && in_fire;
-  assign lfo_clear = enable_rise && (state == ST_IDLE) && !out_buf_valid;
+    logic signed [31:0] lfo_q1_31;
+    logic               lfo_tick;
+    logic               lfo_clear;
 
-  // depth clamp a [0,1]
-  logic signed [31:0] depth_eff;
-  always_comb begin
-    if (depth_q1_31 < 32'sd0)             depth_eff = 32'sd0;
-    else if (depth_q1_31 > 32'sh7FFF_FFFF) depth_eff = 32'sh7FFF_FFFF;
-    else                                   depth_eff = depth_q1_31;
-  end
+    wire in_fire;
+    wire out_fire;
+    wire bypass_mode;
+    wire can_accept;
+    wire enable_rise;
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      state <= ST_IDLE; x_reg <= '0; lfo_r <= '0; gain_r <= '0; out_r <= '0;
-      out_buf <= '0; out_buf_valid <= 1'b0;
-    end else begin
-      if (out_fire) out_buf_valid <= 1'b0;
+    //instancias
+    fx_lfo_tri u_lfo (
+        .clk           (clk              ),
+        .rst_n         (rst_n            ),
+        .tick          (lfo_tick         ),
+        .phase_inc_u32 (lfo_phase_inc_u32),
+        .phase_clear   (lfo_clear        ),
+        .lfo_q1_31     (lfo_q1_31        )
+    );
 
-      if (bypass_mode) begin
-        state <= ST_IDLE;
-        if (in_fire) begin out_buf <= in_data; out_buf_valid <= 1'b1; end
-      end else begin
-        unique case (state)
+    //assigns
+    assign bypass_mode = !enable;
+    assign enable_rise = enable && !enable_d;
 
-          ST_IDLE: if (in_fire) begin
-            x_reg <= in_data;
-            lfo_r <= lfo_q1_31;
-            state <= ST_GAIN;
-          end
+    assign can_accept = (state == ST_IDLE) && !out_buf_valid;
 
-          // gain = 1 - depth*(1+lfo)/2
-          // (1+lfo)/2  en Q1.31: lfo va de -2^31 a +2^31-1.
-          //   (1+lfo)/2 = (lfo >>> 1) + 2^30   -> rango [0, 2^31) = [0,1)
-          // depth_term = depth * (1+lfo)/2     (mul_aud_q31)
-          // gain = 2^31(=1.0) - depth_term  (saturado)
-          ST_GAIN: begin
-            logic signed [31:0] half_lfo;   // (1+lfo)/2 en Q1.31
-            logic signed [31:0] depth_term;
-            half_lfo   = (lfo_r >>> 1) + 32'sh4000_0000;   // (lfo/2)+0.5
-            depth_term = mul_aud_q31(depth_eff, half_lfo);
-            // gain = 1.0 - depth_term ; 1.0 en Q1.31 ~ 0x7FFFFFFF
-            gain_r <= sat_sub32(32'sh7FFF_FFFF, depth_term);
-            state  <= ST_MUL;
-          end
+    assign in_fire  = in_valid  && in_ready;
+    assign out_fire = out_valid && out_ready;
 
-          ST_MUL: begin
-            out_r <= mul_aud_q31(x_reg, gain_r);
-            state <= ST_OUT;
-          end
+    assign lfo_tick = !bypass_mode && (state == ST_IDLE) && in_fire;
+    assign lfo_clear = enable_rise && (state == ST_IDLE) && !out_buf_valid;
 
-          ST_OUT: begin
-            out_buf       <= out_r;
-            out_buf_valid <= 1'b1;
-            state         <= ST_IDLE;
-          end
+    //salidas
+    assign out_valid = out_buf_valid;
+    assign out_data  = out_buf;
+    assign in_ready = can_accept;
 
-          default: state <= ST_IDLE;
-        endcase
-      end
+    //logica combinacional
+    always_comb begin //clamp depth 0 a 1
+        if(depth_q1_31 < 32'sd0) depth_eff = 32'sd0;
+        else if (depth_q1_31 > UNO_Q1_31) depth_eff = UNO_Q1_31;
+        else depth_eff = depth_q1_31;
     end
-  end
+
+    always_comb begin
+        half_lfo = (lfo_reg >>> 1) + 32'sh4000_0000; //lfo/2 + 1/2
+        //Se suma 0.5 antes de desplazar para redondear.
+        mul_result = sat32((mul_product_reg + (64'sd1 <<< 30)) >>> 31); //redondeo
+        gain_next  = sat_sub32( UNO_Q1_31, mul_result);
+    end
+
+    //logica secuencial y FSM
+    always_ff @(posedge clk)begin
+        if(!rst_n)
+            enable_d <= 1'b0;
+        else
+            enable_d <= enable;
+    end
+
+    always_ff @(posedge clk)begin
+        if(!rst_n)begin
+            state <= ST_IDLE;
+
+            out_buf_valid   <= 1'b0;
+            out_buf         <= '0;
+
+            sample_reg      <= '0;
+            lfo_reg         <= '0;
+            depth_reg       <= '0;
+
+            mul_a_reg       <= '0;
+            mul_b_reg       <= '0;
+            mul_product_reg <= '0;
+        end
+        else begin
+            if(out_fire) out_buf_valid <= 1'b0;
+
+            if((state == ST_MUL_GAIN) || (state == ST_MUL_AUDIO)) begin
+                mul_product_reg <= $signed(mul_a_reg) * $signed(mul_b_reg);
+            end
+
+            if(bypass_mode)begin
+                state <= ST_IDLE;
+
+                if(in_fire)begin
+                    out_buf <= in_data;
+                    out_buf_valid <= 1'b1;
+                end
+            end
+            else begin
+                case (state)
+                    ST_IDLE: begin
+                        if(in_fire) begin
+                            sample_reg <= in_data;
+                            lfo_reg    <= lfo_q1_31;
+                            depth_reg  <= depth_eff;
+                            state      <= ST_LOAD_GAIN;
+                        end
+                    end
+
+                    ST_LOAD_GAIN: begin
+                        mul_a_reg <= depth_reg;
+                        mul_b_reg <= half_lfo;
+                        state <= ST_MUL_GAIN;
+                    end
+
+                    ST_MUL_GAIN: begin
+                        state <= ST_LOAD_AUDIO;
+                    end
+
+                    ST_LOAD_AUDIO:begin
+
+                        mul_a_reg <= sample_reg;
+                        mul_b_reg <= gain_next;
+
+                        state <= ST_MUL_AUDIO;
+                    end
+
+                    ST_MUL_AUDIO: begin
+                        state <= ST_SAVE_OUTPUT;
+                    end
+
+                    ST_SAVE_OUTPUT: begin
+                        out_buf       <= mul_result;
+                        out_buf_valid <= 1'b1;
+                        state         <= ST_IDLE;
+                    end
+                    default: begin
+                        state <= ST_IDLE;
+                    end
+
+                endcase
+
+            end
+        end
+    end
 
 endmodule

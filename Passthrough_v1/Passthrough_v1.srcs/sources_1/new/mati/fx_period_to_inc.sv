@@ -16,9 +16,7 @@
 //
 // Reset sincrono activo en bajo mediante rst_n.
 // =============================================================================
-module fx_period_to_inc #(
-  parameter int GLIDE = 10
-)(
+module fx_period_to_inc(
   input  logic        clk,
   input  logic        rst_n,
 
@@ -26,6 +24,7 @@ module fx_period_to_inc #(
   input  logic        period_valid,
   input  logic        gate,
   input  logic        sample_tick,
+  input  logic [4:0]  glide_shift,
 
   output logic [31:0] phase_inc,
   output logic        inc_valid
@@ -51,7 +50,7 @@ module fx_period_to_inc #(
   logic [31:0] inc_target;
 
   always_ff @(posedge clk) begin
-    if (!rst_n) begin
+    if (!rst_n || !gate) begin
       ds         <= D_IDLE;
       rem        <= '0;
       quot       <= '0;
@@ -123,18 +122,20 @@ module fx_period_to_inc #(
 
       // div_done se observa un ciclo despues de D_DONE; para entonces
       // inc_target ya contiene el cociente nuevo.
-      if (div_done) begin
+      if (!gate) begin
+        have_target <= 1'b0;
+      end else if (div_done) begin
         if (!have_target) begin
-          // Primera nota: no hacer glide desde 0 Hz.
+          // Primera nota de cada apertura: enganchar sin glide desde la anterior.
           inc_smooth <= inc_target;
           inc_valid  <= 1'b1;
         end
         have_target <= 1'b1;
       end
 
-      // Sin gate se conserva la ultima frecuencia. El VCA silencia la voz.
+      // Sin gate se conserva la frecuencia para la salida suave del VCA.
       if (gate && have_target && sample_tick && !div_done) begin
-        if (GLIDE == 0) begin
+        if (glide_shift == 0) begin
           if (inc_smooth != inc_target) begin
             inc_smooth <= inc_target;
             inc_valid  <= 1'b1;
@@ -153,12 +154,12 @@ module fx_period_to_inc #(
           step_s    = 33'sd0;
 
           if (diff_s > 0) begin
-            step_s = diff_s >>> GLIDE;
+            step_s = diff_s >>> glide_shift;
             if (step_s == 0)
               step_s = 33'sd1;
           end else if (diff_s < 0) begin
             mag_s  = $unsigned(-diff_s);
-            step_s = -$signed(mag_s >> GLIDE);
+            step_s = -$signed(mag_s >> glide_shift);
             if (step_s == 0)
               step_s = -33'sd1;
           end
@@ -181,12 +182,5 @@ module fx_period_to_inc #(
       end
     end
   end
-
-`ifndef SYNTHESIS
-  initial begin
-    if ((GLIDE < 0) || (GLIDE > 31))
-      $error("fx_period_to_inc: GLIDE debe estar entre 0 y 31");
-  end
-`endif
 
 endmodule

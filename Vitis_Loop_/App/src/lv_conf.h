@@ -69,7 +69,7 @@
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
     /** Size of memory available for `lv_malloc()` in bytes (>= 2kB) */
-    #define LV_MEM_SIZE (256 * 1024U)          /**< [bytes] */
+    #define LV_MEM_SIZE (512 * 1024U)          /**< [bytes] */
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0
@@ -510,8 +510,15 @@
 #define LV_USE_ASSERT_OBJ           0   /**< Check the object's type and existence (e.g. not deleted). (Slow) */
 
 /** Add a custom handler when assert happens e.g. to restart MCU. */
-#define LV_ASSERT_HANDLER_INCLUDE <stdint.h>
-#define LV_ASSERT_HANDLER while(1);     /**< Halt by default */
+#define LV_ASSERT_HANDLER do { \
+    extern void xil_printf(const char *ctrl1, ...); \
+    extern void ili9341_fill_rect(uint16_t, uint16_t, uint16_t, uint16_t, uint16_t); \
+    xil_printf("\r\n========================================\r\n"); \
+    xil_printf("[LVGL ASSERT FAIL] %s:%d\r\n", __FILE__, __LINE__); \
+    xil_printf("========================================\r\n"); \
+    ili9341_fill_rect(0, 60, 320, 20, 0xF800); \
+    while(1); \
+} while(0)
 
 /*-------------
  * Check arg

@@ -1,7 +1,12 @@
 [
 {
-  "directory": "X:/Entrega_Tesis/Vitis_Loop_/Loop_y_SD/build",
-  "command": "X:\\Xilinx\\2025.1\\Vitis\\gnu\\aarch32\\nt\\gcc-arm-none-eabi\\bin\\arm-none-eabi-gcc.exe -DUSE_AMP=1 -isystem X:/Entrega_Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/include -isystem X:/Xilinx/2025.1/gnu/aarch32/nt/gcc-arm-none-eabi/x86_64-oesdk-mingw32/usr/lib/arm-xilinx-eabi/gcc/arm-xilinx-eabi/13.3.0/include -isystem X:/Xilinx/2025.1/gnu/aarch32/nt/gcc-arm-none-eabi/x86_64-oesdk-mingw32/usr/lib/arm-xilinx-eabi/gcc/arm-xilinx-eabi/13.3.0/include-fixed -isystem X:/Xilinx/2025.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/aarch32-xilinx-eabi/usr/include  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=X:/Entrega_Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/Xilinx.spec -IX:/Entrega_Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/include -Wall -Wextra      -O3  -g3     -U__clang__ -o CMakeFiles\\Loop_y_SD.elf.dir\\main.c.obj -c X:\\Entrega_Tesis\\Vitis_Loop_\\Loop_y_SD\\src\\main.c",
-  "file": "X:\\Entrega_Tesis\\Vitis_Loop_\\Loop_y_SD\\src\\main.c"
+  "directory": "X:/Tesis/Comp_synth/Vitis_Loop_/Loop_y_SD/build",
+  "command": "X:\\Xilinx\\2025.1\\Vitis\\gnu\\aarch32\\nt\\gcc-arm-none-eabi\\bin\\arm-none-eabi-gcc.exe -DUSE_AMP=1 -isystem X:/Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/include -isystem X:/Xilinx/2025.1/gnu/aarch32/nt/gcc-arm-none-eabi/x86_64-oesdk-mingw32/usr/lib/arm-xilinx-eabi/gcc/arm-xilinx-eabi/13.3.0/include -isystem X:/Xilinx/2025.1/gnu/aarch32/nt/gcc-arm-none-eabi/x86_64-oesdk-mingw32/usr/lib/arm-xilinx-eabi/gcc/arm-xilinx-eabi/13.3.0/include-fixed -isystem X:/Xilinx/2025.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/aarch32-xilinx-eabi/usr/include  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=X:/Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/Xilinx.spec -IX:/Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/include -Wall -Wextra      -O3  -g3     -U__clang__ -o CMakeFiles\\Loop_y_SD.elf.dir\\main.c.obj -c X:\\Tesis\\Comp_synth\\Vitis_Loop_\\Loop_y_SD\\src\\main.c",
+  "file": "X:\\Tesis\\Comp_synth\\Vitis_Loop_\\Loop_y_SD\\src\\main.c"
+},
+{
+  "directory": "X:/Tesis/Comp_synth/Vitis_Loop_/Loop_y_SD/build",
+  "command": "X:\\Xilinx\\2025.1\\Vitis\\gnu\\aarch32\\nt\\gcc-arm-none-eabi\\bin\\arm-none-eabi-gcc.exe -DUSE_AMP=1  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=X:/Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/Xilinx.spec -IX:/Tesis/Vitis_Loop_/platform/export/platform/sw/CORE1/include -o CMakeFiles\\Loop_y_SD.elf.dir\\translation_table.S.obj -c X:\\Tesis\\Comp_synth\\Vitis_Loop_\\Loop_y_SD\\src\\translation_table.S",
+  "file": "X:\\Tesis\\Comp_synth\\Vitis_Loop_\\Loop_y_SD\\src\\translation_table.S"
 }
 ]

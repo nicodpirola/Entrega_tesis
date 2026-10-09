@@ -45,6 +45,7 @@ void ili9341_fill_screen(u16 color);
 void ili9341_fill_rect(u16 x, u16 y, u16 w, u16 h, u16 color);
 void ili9341_draw_pixel(u16 x, u16 y, u16 color);
 void ili9341_flush_region(u16 x1, u16 y1, u16 x2, u16 y2, const u8 *data);
+void ili9341_test_pattern(void);
 
 
 

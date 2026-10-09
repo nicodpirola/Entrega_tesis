@@ -29,6 +29,7 @@ set(USER_INCLUDE_DIRECTORIES
 )
 set(USER_COMPILE_SOURCES
 "main.c"
+"translation_table.S"
 )
 
 # -----------------------------------------

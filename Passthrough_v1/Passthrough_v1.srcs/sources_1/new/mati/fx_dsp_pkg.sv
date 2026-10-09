@@ -73,7 +73,6 @@ package fx_dsp_pkg;
     end
   endfunction // mul_q29_q31_to_q31
 
-  
   function automatic logic [31:0] abs32(input logic signed [31:0] x);
      if (x == 32'sh8000_0000) abs32 = 32'h7FFF_FFFF;
      else                     abs32 = x[31] ? -x : x;
@@ -84,7 +83,7 @@ endfunction
     input logic signed [31:0] x,
     input logic signed [31:0] T1_q29,
     input logic signed [31:0] T2_q29,
-    input logic signed [31:0] k1_q31,                 
+    input logic signed [31:0] k1_q31,
     input logic signed [31:0] k2_q31
   );
     logic signed [31:0] y, y_mag;
@@ -98,7 +97,7 @@ endfunction
       if ($signed(T2_q29) < $signed(T1_q29))begin
         delta1 = 32'sd0;
         delta2 = 32'sd0;
-        Y2_q29 = T1_q29;        
+        Y2_q29 = T1_q29;
       end else begin
         delta1 = sat_sub32(a_q29, T1_q29);
         delta2 = sat_sub32(a_q29, T2_q29);
@@ -119,5 +118,4 @@ endfunction
     end
   endfunction // softclip_pw2_q29
 
-  
 endpackage

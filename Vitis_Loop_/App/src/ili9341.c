@@ -45,8 +45,10 @@ static void spi_send(const u8 *data, u32 len) {
     u32 NumBytesSent = 0;
     u32 NumBytesReceived = 0;
     u32 BaseAddr = SpiInstance.BaseAddr;
+    u32 timeout = 5000000;
     
-    while (NumBytesSent < len || NumBytesReceived < len) {
+    while ((NumBytesSent < len || NumBytesReceived < len) && timeout > 0) {
+        timeout--;
         //Vaciar RX FIFO siempre primero para evitar overrun
         while (NumBytesReceived < NumBytesSent && !(XSpi_ReadReg(BaseAddr, XSP_SR_OFFSET) & XSP_SR_RX_EMPTY_MASK)) {
             XSpi_ReadReg(BaseAddr, XSP_DRR_OFFSET);

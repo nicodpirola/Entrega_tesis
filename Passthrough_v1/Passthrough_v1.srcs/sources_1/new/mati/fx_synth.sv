@@ -9,12 +9,12 @@
 //   tune ratio OSC2/OSC3   : UQ2.30 unsigned, 1.0 = 0x40000000
 //   coeficientes biquad    : Q2.30 signed
 //
-// RANGE usa -2,-1,0,+1,+2 para 32',16',8',4',2'. El modo LO del
-// Minimoog no se implementa aqui; debe ser un LFO/frecuencia independiente.
-//
-// Los incrementos se precalculan al cambiar pitch/range/tune. Hay un unico
-// multiplicador unsigned para TUNE y un unico multiplicador signed compartido
-// para niveles/VCA. La salida se calcula en pocos clocks por sample_tick.
+// FIX DE TIMING (v2): el producto del multiplicador se REGISTRA (prod_r) antes
+// de sumarlo al acumulador. Antes el camino mult(32x32)->sat32(64)->acc(64) era
+// combinacional en un ciclo y no cerraba (WNS -8.5ns). Ahora:
+//   S_Ox_MUL: prod_r <= mul_q3_29     (multiplicador + saturacion)
+//   S_Ox_ACC: mix_acc <= mix_acc+prod_r (solo suma)
+// asi el multiplicador y el acumulador nunca comparten camino combinacional.
 // =============================================================================
 module fx_synth (
   input  logic               clk,
@@ -56,9 +56,6 @@ module fx_synth (
   // ---------------------------------------------------------------------------
   // RANGE y TUNE con limite final de Nyquist
   // ---------------------------------------------------------------------------
-  // La afinacion de OSC2/OSC3 se calcula primero en 34 bits y RANGE se aplica
-  // despues. De esta forma no se satura prematuramente un valor que luego
-  // podria bajar de octava.
   function automatic logic [31:0] range_and_limit(
     input logic [33:0]       inc_wide,
     input logic signed [3:0] range_sel
@@ -102,7 +99,6 @@ module fx_synth (
   logic signed [3:0] range2_snapshot;
   logic signed [3:0] range3_snapshot;
 
-  // Copias de la configuracion que produjo los incrementos vigentes.
   logic [31:0]       cfg_base_d;
   logic [31:0]       cfg_tune2_d;
   logic [31:0]       cfg_tune3_d;
@@ -119,7 +115,6 @@ module fx_synth (
       (osc2_range      != cfg_range2_d) ||
       (osc3_range      != cfg_range3_d);
 
-  // Un unico multiplicador unsigned para afinar OSC2/OSC3.
   logic [31:0] tune_mul_a;
   logic [31:0] tune_mul_b;
   wire  [63:0] tune_mul_product = tune_mul_a * tune_mul_b;
@@ -161,8 +156,6 @@ module fx_synth (
       cfg_range3_d     <= '0;
       recalc_pending   <= 1'b0;
     end else begin
-      // Si cambia algo mientras la FSM esta ocupada, se repite el precalculo
-      // al terminar usando la configuracion mas reciente.
       if (inc_valid || cfg_changed)
         recalc_pending <= 1'b1;
 
@@ -215,7 +208,6 @@ module fx_synth (
       {lfsr[30:0], lfsr[31] ^ lfsr[21] ^ lfsr[1] ^ lfsr[0]};
   wire signed [31:0] noise_sample = $signed(lfsr) >>> 2;
 
-  // division por 3 via reciproco (0x55555556 ~ 1/3 en Q0.32): mas rapido que /3
   function automatic logic [31:0] div3(input logic [31:0] x);
     logic [63:0] p;
     begin
@@ -269,16 +261,20 @@ module fx_synth (
   // ---------------------------------------------------------------------------
   typedef enum logic [3:0] {
     S_IDLE    = 4'd0,
-    S_O1_GEN  = 4'd1,   // registra forma OSC1 (gen_wave con div3)
-    S_O1_MUL  = 4'd2,   // multiplica y acumula OSC1
-    S_O2_GEN  = 4'd3,
-    S_O2_MUL  = 4'd4,
-    S_O3_GEN  = 4'd5,
-    S_O3_MUL  = 4'd6,
-    S_NZ      = 4'd7,
-    S_ACC     = 4'd8,
-    S_FILT    = 4'd9,
-    S_VCA     = 4'd10
+    S_O1_GEN  = 4'd1,   // registra forma OSC1
+    S_O1_MUL  = 4'd2,   // registra producto OSC1 (mult+sat)
+    S_O1_ACC  = 4'd3,   // suma al acumulador
+    S_O2_GEN  = 4'd4,
+    S_O2_MUL  = 4'd5,
+    S_O2_ACC  = 4'd6,
+    S_O3_GEN  = 4'd7,
+    S_O3_MUL  = 4'd8,
+    S_O3_ACC  = 4'd9,
+    S_NZ_MUL  = 4'd10,  // registra producto ruido
+    S_NZ_ACC  = 4'd11,  // suma ruido al acumulador
+    S_ACC     = 4'd12,
+    S_FILT    = 4'd13,
+    S_VCA     = 4'd14
   } state_t;
 
   state_t st;
@@ -289,35 +285,33 @@ module fx_synth (
   wire  signed [31:0] mul_q3_29 =
       sat32((mul_product + (64'sd1 <<< 30)) >>> 31);
 
-  // La forma de onda se genera y registra en estados _GEN; aca solo se multiplica
-  // el valor YA registrado (wave_r). Asi gen_wave (con div3) y el multiplicador
-  // 32x32 nunca comparten el mismo camino combinacional -> cierra timing a 50MHz.
-  always_comb begin
-    case (st)
-      S_O1_MUL: begin mul_a = wave_r;       mul_b = osc1_level; end
-      S_O2_MUL: begin mul_a = wave_r;       mul_b = osc2_level; end
-      S_O3_MUL: begin mul_a = wave_r;       mul_b = osc3_level; end
-      S_NZ:     begin mul_a = noise_sample; mul_b = noise_level; end
-      S_VCA:    begin mul_a = bq_out;       mul_b = env_vca_q1_31; end
-      default:  begin mul_a = 32'sd0;       mul_b = 32'sd0; end
-    endcase
-  end
-
-  // ---------------------------------------------------------------------------
-  // Mixer, filtro provisional y VCA
-  // ---------------------------------------------------------------------------
-  logic signed [31:0] wave_r;       // forma de onda registrada (rompe camino critico)
+  logic signed [31:0] wave_r;       // forma de onda registrada
+  logic signed [31:0] prod_r;       // producto registrado (rompe mult->acc)
   logic signed [63:0] mix_acc;
   logic signed [31:0] mix_sat;
   logic signed [31:0] synth_reg;
   logic               synth_valid_reg;
 
-  assign synth_out   = synth_reg;
-  assign synth_valid = synth_valid_reg;
-
   logic               bq_in_valid;
   logic               bq_out_valid;
   logic signed [31:0] bq_out;
+
+  assign synth_out   = synth_reg;
+  assign synth_valid = synth_valid_reg;
+
+  // El multiplicador toma su operando segun el estado. En los estados _MUL
+  // registramos el producto; en _ACC lo sumamos. Asi mult y acumulador
+  // quedan en ciclos separados.
+  always_comb begin
+    case (st)
+      S_O1_MUL: begin mul_a = wave_r;       mul_b = osc1_level; end
+      S_O2_MUL: begin mul_a = wave_r;       mul_b = osc2_level; end
+      S_O3_MUL: begin mul_a = wave_r;       mul_b = osc3_level; end
+      S_NZ_MUL: begin mul_a = noise_sample; mul_b = noise_level; end
+      S_VCA:    begin mul_a = bq_out;       mul_b = env_vca_q1_31; end
+      default:  begin mul_a = 32'sd0;       mul_b = 32'sd0; end
+    endcase
+  end
 
   fx_biquad u_filter (
     .clk       (clk),
@@ -345,6 +339,7 @@ module fx_synth (
       ph3             <= '0;
       lfsr            <= 32'hACE1_ACE1;
       wave_r          <= '0;
+      prod_r          <= '0;
       mix_acc         <= '0;
       mix_sat         <= '0;
       synth_reg       <= '0;
@@ -366,18 +361,22 @@ module fx_synth (
           end
         end
 
-        // Cada oscilador: GEN registra la forma, MUL multiplica y acumula.
+        // OSC1: GEN forma -> MUL producto -> ACC suma
         S_O1_GEN: begin wave_r <= gen_wave(ph1, osc1_wave, 1'b0); st <= S_O1_MUL; end
-        S_O1_MUL: begin mix_acc <= mix_acc + mul_q3_29;           st <= S_O2_GEN; end
-        S_O2_GEN: begin wave_r <= gen_wave(ph2, osc2_wave, 1'b0); st <= S_O2_MUL; end
-        S_O2_MUL: begin mix_acc <= mix_acc + mul_q3_29;           st <= S_O3_GEN; end
-        S_O3_GEN: begin wave_r <= gen_wave(ph3, osc3_wave, 1'b1); st <= S_O3_MUL; end
-        S_O3_MUL: begin mix_acc <= mix_acc + mul_q3_29;           st <= S_NZ; end
+        S_O1_MUL: begin prod_r <= mul_q3_29;                       st <= S_O1_ACC; end
+        S_O1_ACC: begin mix_acc <= mix_acc + prod_r;               st <= S_O2_GEN; end
 
-        S_NZ: begin
-          mix_acc <= mix_acc + mul_q3_29;
-          st      <= S_ACC;
-        end
+        S_O2_GEN: begin wave_r <= gen_wave(ph2, osc2_wave, 1'b0); st <= S_O2_MUL; end
+        S_O2_MUL: begin prod_r <= mul_q3_29;                       st <= S_O2_ACC; end
+        S_O2_ACC: begin mix_acc <= mix_acc + prod_r;               st <= S_O3_GEN; end
+
+        S_O3_GEN: begin wave_r <= gen_wave(ph3, osc3_wave, 1'b1); st <= S_O3_MUL; end
+        S_O3_MUL: begin prod_r <= mul_q3_29;                       st <= S_O3_ACC; end
+        S_O3_ACC: begin mix_acc <= mix_acc + prod_r;               st <= S_NZ_MUL; end
+
+        // Ruido: MUL producto -> ACC suma
+        S_NZ_MUL: begin prod_r <= mul_q3_29;         st <= S_NZ_ACC; end
+        S_NZ_ACC: begin mix_acc <= mix_acc + prod_r; st <= S_ACC;    end
 
         S_ACC: begin
           mix_sat     <= sat32(mix_acc);
@@ -402,7 +401,6 @@ module fx_synth (
   end
 
 `ifndef SYNTHESIS
-  // La arquitectura supone que termina antes del siguiente sample_tick.
   always_ff @(posedge clk) begin
     if (rst_n && sample_tick && (st != S_IDLE))
       $error("fx_synth overrun: sample_tick con FSM ocupada (st=%0d)", st);
