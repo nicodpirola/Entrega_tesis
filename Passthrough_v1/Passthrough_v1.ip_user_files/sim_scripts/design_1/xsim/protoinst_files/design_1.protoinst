@@ -940,7 +940,7 @@
 				"/axi_smc/M06_AXI": {
 					"interface": "xilinx.com:interface:aximm:1.0",
 					"ports": {
-						"ACLK": { "actual": "aclk1"},
+						"ACLK": { "actual": "aclk"},
 						"ARADDR": { "actual": "M06_AXI_araddr[6:0]"},
 						"ARPROT": { "actual": "M06_AXI_arprot[2:0]"},
 						"ARREADY": { "actual": "M06_AXI_arready"},

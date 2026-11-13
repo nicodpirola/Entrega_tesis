@@ -1010,7 +1010,7 @@ logic               delay_valid;
 logic               delay_ready;
 logic signed [31:0] delay_data;
 
-fx_delay_simple #(
+fx_delay #(
     .ADDR_W(15)
 ) u_delay(
     .clk        (clk),
@@ -1028,7 +1028,9 @@ fx_delay_simple #(
 
     .D_16_16    (delay_cfg.time_16_16),
     .fb_q1_31   ($signed(delay_cfg.fb_q1_31)),
-    .wet_q1_31  ($signed(delay_cfg.wet_q1_31))
+    .wet_q1_31  ($signed(delay_cfg.wet_q1_31)),
+    .lpf_on     (delay_cfg.ctrl[0]),
+    .lpf_G_q1_31($signed(delay_cfg.lpf_g_q1_31))
 );
 
 // =============================================================================

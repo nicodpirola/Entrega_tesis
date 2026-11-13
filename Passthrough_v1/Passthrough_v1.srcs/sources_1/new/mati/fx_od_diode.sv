@@ -1,9 +1,9 @@
 `timescale 1ns/1ps
-//! @title Recorte de diodos del overdrive
-//! @file fx_od_diode.sv
-//! @brief Tabla positiva con intervalos variables e interpolacion lineal.
-//! Entrada u Q12.20; salida v/V_FS Q3.29 para sumar a la rama directa.
-//! La tabla y los coeficientes de la rama deben corresponder al mismo Drive.
+// fx_od_diode.sv
+// Recorte de diodos del overdrive: tabla positiva con intervalos variables e interpolacion lineal.
+//
+// Entrada u Q12.20; salida v/V_FS Q3.29 para sumar a la rama directa.
+// La tabla y los coeficientes de la rama deben corresponder al mismo Drive.
 
 module fx_od_diode #(
     parameter string TABLE_FILE = ""

@@ -7,7 +7,7 @@ package fx_ctrl_pkg;
 // =============================================================================
 
 localparam logic [31:0] FX_CORE_ID      = 32'h4658_5448; // "FXTH"
-localparam logic [31:0] FX_CORE_VERSION = 32'h0001_0300; // v1.3.0: pitch YIN 48 kHz + post-procesado (perfil guitarra/theremin)
+localparam logic [31:0] FX_CORE_VERSION = 32'h0001_0400; // v1.4.0: delay con pasabajos tpt en lazo de feedback
 
 localparam int FX_EN_OCTAVER = 0;
 localparam int FX_EN_WAH     = 1;
@@ -190,6 +190,7 @@ localparam logic [11:0] REG_DELAY_CTRL       = 12'h640;
 localparam logic [11:0] REG_DELAY_TIME       = 12'h644;
 localparam logic [11:0] REG_DELAY_FB         = 12'h648;
 localparam logic [11:0] REG_DELAY_WET        = 12'h64C;
+localparam logic [11:0] REG_DELAY_LPF_G      = 12'h650;
 
 // Reverb
 localparam logic [11:0] REG_REVERB_CTRL      = 12'h680;
@@ -404,6 +405,7 @@ typedef struct packed {
     logic [31:0] time_16_16;
     logic [31:0] fb_q1_31;
     logic [31:0] wet_q1_31;
+    logic [31:0] lpf_g_q1_31;
 } delay_cfg_t;
 
 typedef struct packed {

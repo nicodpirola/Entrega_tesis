@@ -4,7 +4,7 @@
 #include "xil_types.h"
 
 #define FX_CORE_ID_VALUE       0x46585448u
-#define FX_CORE_VERSION_VALUE  0x00010300u
+#define FX_CORE_VERSION_VALUE  0x00010400u
 
 /* Global */
 #define FX_REG_CORE_CTRL        0x000u
@@ -124,6 +124,7 @@
 #define FX_REG_DELAY_TIME        0x644u
 #define FX_REG_DELAY_FB          0x648u
 #define FX_REG_DELAY_WET         0x64Cu
+#define FX_REG_DELAY_LPF_G       0x650u
 #define FX_REG_REVERB_CTRL       0x680u
 #define FX_REG_REVERB_MIX        0x684u
 #define FX_REG_REVERB_DECAY      0x688u

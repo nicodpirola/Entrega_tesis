@@ -1,7 +1,9 @@
 `timescale 1ns/1ps
-//! @title Pasaaltos de entrada y salida del overdrive
-//! @brief Uno o dos filtros TPT con un multiplicador compartido de 32x32 bits.
-//! Audio Q3.29, memoria del filtro Q5.27 y coeficientes Q1.31.
+// fx_od_hpf.sv
+// Pasaaltos de entrada y salida del overdrive: uno o dos filtros TPT.
+//
+// Audio Q3.29, memoria del filtro Q5.27 y coeficientes Q1.31.
+// Un multiplicador de 32x32 bits compartido.
 module fx_od_hpf #(
     parameter integer ETAPAS = 1
 )(

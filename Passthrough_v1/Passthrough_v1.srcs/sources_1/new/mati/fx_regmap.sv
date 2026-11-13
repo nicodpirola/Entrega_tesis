@@ -124,15 +124,9 @@ logic [31:0] cab_coef_data_r;
 assign wr_off = {awaddr_r[11:2], 2'b00};
 assign rd_off = {s_axi_araddr[11:2], 2'b00};
 
-assign s_axi_awready =
-    rst_n &&
-    !aw_pending &&
-    !s_axi_bvalid;
+assign s_axi_awready =  rst_n && !aw_pending && !s_axi_bvalid;
 
-assign s_axi_wready =
-    rst_n &&
-    !w_pending &&
-    !s_axi_bvalid;
+assign s_axi_wready =   rst_n && !w_pending &&  !s_axi_bvalid;
 
 assign s_axi_bresp = 2'b00;
 
@@ -359,6 +353,7 @@ always_ff @(posedge clk) begin
         o_delay_cfg.time_16_16 <= 32'h3840_0000;
         o_delay_cfg.fb_q1_31 <= 32'h3333_3333;
         o_delay_cfg.wet_q1_31 <= 32'h4000_0000;
+        o_delay_cfg.lpf_g_q1_31 <= 32'h153C_8FAB; //3K
 
         // Reverb reserved
         o_reverb_cfg.ctrl <= 32'd0;
@@ -1001,6 +996,8 @@ always_ff @(posedge clk) begin
                         o_delay_cfg.fb_q1_31 <= apply_wstrb(o_delay_cfg.fb_q1_31, wdata_r, wstrb_r);
                     REG_DELAY_WET:
                         o_delay_cfg.wet_q1_31 <= apply_wstrb(o_delay_cfg.wet_q1_31, wdata_r, wstrb_r);
+                    REG_DELAY_LPF_G:
+                        o_delay_cfg.lpf_g_q1_31 <= apply_wstrb(o_delay_cfg.lpf_g_q1_31, wdata_r, wstrb_r);
 
                     REG_REVERB_CTRL:
                         o_reverb_cfg.ctrl <= apply_wstrb(o_reverb_cfg.ctrl, wdata_r, wstrb_r);
@@ -1276,6 +1273,7 @@ always_comb begin
             REG_DELAY_TIME: read_data_w = o_delay_cfg.time_16_16;
             REG_DELAY_FB:   read_data_w = o_delay_cfg.fb_q1_31;
             REG_DELAY_WET:  read_data_w = o_delay_cfg.wet_q1_31;
+            REG_DELAY_LPF_G: read_data_w = o_delay_cfg.lpf_g_q1_31;
 
             // Reverb
             REG_REVERB_CTRL:      read_data_w = o_reverb_cfg.ctrl;

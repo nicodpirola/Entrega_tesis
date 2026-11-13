@@ -7,7 +7,7 @@
 //--------------------------------------------------------------------------------
 `timescale 1 ps / 1 ps
 
-(* CORE_GENERATION_INFO = "bd_6e42,IP_Integrator,{x_ipVendor=xilinx.com,x_ipLibrary=BlockDiagram,x_ipName=bd_6e42,x_ipVersion=1.00.a,x_ipLanguage=VERILOG,numBlks=96,numReposBlks=77,numNonXlnxBlks=0,numHierBlks=19,maxHierDepth=2,numSysgenBlks=0,numHlsBlks=0,numHdlrefBlks=0,numPkgbdBlks=0,bdsource=SBD,synth_mode=None}" *) (* HW_HANDOFF = "design_1_axi_smc_2.hwdef" *) 
+(* CORE_GENERATION_INFO = "bd_6e42,IP_Integrator,{x_ipVendor=xilinx.com,x_ipLibrary=BlockDiagram,x_ipName=bd_6e42,x_ipVersion=1.00.a,x_ipLanguage=VERILOG,numBlks=94,numReposBlks=75,numNonXlnxBlks=0,numHierBlks=19,maxHierDepth=2,numSysgenBlks=0,numHlsBlks=0,numHdlrefBlks=0,numPkgbdBlks=0,bdsource=SBD,synth_mode=None}" *) (* HW_HANDOFF = "design_1_axi_smc_2.hwdef" *) 
 module bd_6e42
    (M00_AXI_araddr,
     M00_AXI_arprot,
@@ -181,7 +181,6 @@ module bd_6e42
     S00_AXI_wstrb,
     S00_AXI_wvalid,
     aclk,
-    aclk1,
     aresetn);
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M00_AXI ARADDR" *) (* X_INTERFACE_MODE = "Master" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME M00_AXI, ADDR_WIDTH 8, ARUSER_WIDTH 0, AWUSER_WIDTH 0, BUSER_WIDTH 0, CLK_DOMAIN design_1_processing_system7_0_0_FCLK_CLK0, DATA_WIDTH 32, FREQ_HZ 50000000, HAS_BRESP 1, HAS_BURST 0, HAS_CACHE 0, HAS_LOCK 0, HAS_PROT 1, HAS_QOS 0, HAS_REGION 0, HAS_RRESP 1, HAS_WSTRB 1, ID_WIDTH 0, INSERT_VIP 0, MAX_BURST_LENGTH 1, NUM_READ_OUTSTANDING 8, NUM_READ_THREADS 1, NUM_WRITE_OUTSTANDING 8, NUM_WRITE_THREADS 1, PHASE 0.0, PROTOCOL AXI4LITE, READ_WRITE_MODE READ_WRITE, RUSER_BITS_PER_BYTE 0, RUSER_WIDTH 0, SUPPORTS_NARROW_BURST 0, WUSER_BITS_PER_BYTE 0, WUSER_WIDTH 0" *) output [7:0]M00_AXI_araddr;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M00_AXI ARPROT" *) output [2:0]M00_AXI_arprot;
@@ -297,7 +296,7 @@ module bd_6e42
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M05_AXI WREADY" *) input M05_AXI_wready;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M05_AXI WSTRB" *) output [3:0]M05_AXI_wstrb;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M05_AXI WVALID" *) output M05_AXI_wvalid;
-  (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M06_AXI ARADDR" *) (* X_INTERFACE_MODE = "Master" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME M06_AXI, ADDR_WIDTH 7, ARUSER_WIDTH 0, AWUSER_WIDTH 0, BUSER_WIDTH 0, CLK_DOMAIN /clk_wiz_0_clk_out1, DATA_WIDTH 32, FREQ_HZ 12286002, HAS_BRESP 1, HAS_BURST 0, HAS_CACHE 0, HAS_LOCK 0, HAS_PROT 1, HAS_QOS 0, HAS_REGION 0, HAS_RRESP 1, HAS_WSTRB 1, ID_WIDTH 0, INSERT_VIP 0, MAX_BURST_LENGTH 1, NUM_READ_OUTSTANDING 8, NUM_READ_THREADS 1, NUM_WRITE_OUTSTANDING 8, NUM_WRITE_THREADS 1, PHASE 0.0, PROTOCOL AXI4LITE, READ_WRITE_MODE READ_WRITE, RUSER_BITS_PER_BYTE 0, RUSER_WIDTH 0, SUPPORTS_NARROW_BURST 0, WUSER_BITS_PER_BYTE 0, WUSER_WIDTH 0" *) output [6:0]M06_AXI_araddr;
+  (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M06_AXI ARADDR" *) (* X_INTERFACE_MODE = "Master" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME M06_AXI, ADDR_WIDTH 7, ARUSER_WIDTH 0, AWUSER_WIDTH 0, BUSER_WIDTH 0, CLK_DOMAIN design_1_processing_system7_0_0_FCLK_CLK0, DATA_WIDTH 32, FREQ_HZ 50000000, HAS_BRESP 1, HAS_BURST 0, HAS_CACHE 0, HAS_LOCK 0, HAS_PROT 1, HAS_QOS 0, HAS_REGION 0, HAS_RRESP 1, HAS_WSTRB 1, ID_WIDTH 0, INSERT_VIP 0, MAX_BURST_LENGTH 1, NUM_READ_OUTSTANDING 8, NUM_READ_THREADS 1, NUM_WRITE_OUTSTANDING 8, NUM_WRITE_THREADS 1, PHASE 0.0, PROTOCOL AXI4LITE, READ_WRITE_MODE READ_WRITE, RUSER_BITS_PER_BYTE 0, RUSER_WIDTH 0, SUPPORTS_NARROW_BURST 0, WUSER_BITS_PER_BYTE 0, WUSER_WIDTH 0" *) output [6:0]M06_AXI_araddr;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M06_AXI ARPROT" *) output [2:0]M06_AXI_arprot;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M06_AXI ARREADY" *) input M06_AXI_arready;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M06_AXI ARVALID" *) output M06_AXI_arvalid;
@@ -354,8 +353,7 @@ module bd_6e42
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S00_AXI WREADY" *) output S00_AXI_wready;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S00_AXI WSTRB" *) input [3:0]S00_AXI_wstrb;
   (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S00_AXI WVALID" *) input S00_AXI_wvalid;
-  (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 CLK.ACLK CLK" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME CLK.ACLK, ASSOCIATED_BUSIF M00_AXI:M01_AXI:M02_AXI:M03_AXI:M04_AXI:M05_AXI:S00_AXI, ASSOCIATED_CLKEN s_sc_aclken, CLK_DOMAIN design_1_processing_system7_0_0_FCLK_CLK0, FREQ_HZ 50000000, FREQ_TOLERANCE_HZ 0, INSERT_VIP 0, PHASE 0.0" *) input aclk;
-  (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 CLK.ACLK1 CLK" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME CLK.ACLK1, ASSOCIATED_BUSIF M06_AXI, ASSOCIATED_CLKEN s_sc_aclken, CLK_DOMAIN /clk_wiz_0_clk_out1, FREQ_HZ 12286002, FREQ_TOLERANCE_HZ 0, INSERT_VIP 0, PHASE 0.0" *) input aclk1;
+  (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 CLK.ACLK CLK" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME CLK.ACLK, ASSOCIATED_BUSIF M00_AXI:M01_AXI:M02_AXI:M03_AXI:M04_AXI:M05_AXI:M06_AXI:S00_AXI, ASSOCIATED_CLKEN s_sc_aclken, CLK_DOMAIN design_1_processing_system7_0_0_FCLK_CLK0, FREQ_HZ 50000000, FREQ_TOLERANCE_HZ 0, INSERT_VIP 0, PHASE 0.0" *) input aclk;
   (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 RST.ARESETN RST" *) (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME RST.ARESETN, INSERT_VIP 0, POLARITY ACTIVE_LOW" *) input aresetn;
 
   wire [7:0]M00_AXI_araddr;
@@ -730,7 +728,6 @@ module bd_6e42
   wire [0:0]S_SC_W_8_REQ;
   wire [0:0]S_SC_W_8_SEND;
   wire aclk;
-  wire aclk1;
   wire aresetn;
   wire aresetn_net;
   wire clk_map_M00_ACLK;
@@ -1274,7 +1271,6 @@ module bd_6e42
         .S00_ACLK(clk_map_S00_ACLK),
         .S00_ARESETN(clk_map_S00_ARESETN),
         .aclk(aclk),
-        .aclk1(aclk1),
         .aresetn(aresetn),
         .aresetn_out(aresetn_net),
         .swbd_aclk(swbd_aclk_net),
@@ -2963,7 +2959,6 @@ module clk_map_imp_1I4I8XN
     S00_ACLK,
     S00_ARESETN,
     aclk,
-    aclk1,
     aresetn,
     aresetn_out,
     swbd_aclk,
@@ -2985,17 +2980,13 @@ module clk_map_imp_1I4I8XN
   output S00_ACLK;
   output [0:0]S00_ARESETN;
   input aclk;
-  input aclk1;
   input aresetn;
   output aresetn_out;
   output swbd_aclk;
   output [0:0]swbd_aresetn;
 
-  wire M06_ACLK;
-  wire [0:0]M06_ARESETN;
   wire aresetn;
   wire [0:0]one_dout;
-  wire [0:0]psr0_interconnect_aresetn;
   wire swbd_aclk;
   wire [0:0]swbd_aresetn;
 
@@ -3011,33 +3002,20 @@ module clk_map_imp_1I4I8XN
   assign M04_ARESETN[0] = swbd_aresetn;
   assign M05_ACLK = swbd_aclk;
   assign M05_ARESETN[0] = swbd_aresetn;
-  assign M06_ACLK = aclk1;
+  assign M06_ACLK = swbd_aclk;
+  assign M06_ARESETN[0] = swbd_aresetn;
   assign S00_ACLK = swbd_aclk;
   assign S00_ARESETN[0] = swbd_aresetn;
   assign swbd_aclk = aclk;
   bd_6e42_one_0 one
        (.dout(one_dout));
-  bd_6e42_psr0_0 psr0
-       (.aux_reset_in(aresetn),
-        .dcm_locked(1'b1),
-        .ext_reset_in(one_dout),
-        .interconnect_aresetn(psr0_interconnect_aresetn),
-        .mb_debug_sys_rst(1'b0),
-        .slowest_sync_clk(M06_ACLK));
   bd_6e42_psr_aclk_0 psr_aclk
        (.aux_reset_in(aresetn),
         .dcm_locked(1'b1),
-        .ext_reset_in(psr0_interconnect_aresetn),
+        .ext_reset_in(one_dout),
         .interconnect_aresetn(swbd_aresetn),
         .mb_debug_sys_rst(1'b0),
         .slowest_sync_clk(swbd_aclk));
-  bd_6e42_psr_aclk1_0 psr_aclk1
-       (.aux_reset_in(aresetn),
-        .dcm_locked(1'b1),
-        .ext_reset_in(psr0_interconnect_aresetn),
-        .interconnect_aresetn(M06_ARESETN),
-        .mb_debug_sys_rst(1'b0),
-        .slowest_sync_clk(M06_ACLK));
 endmodule
 
 module i_nodes_imp_TU4PH

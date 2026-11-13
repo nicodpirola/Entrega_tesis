@@ -1,34 +1,26 @@
-//! @title Efecto Tremolo
-//! @file fx_tremolo.sv
-//! @author [Matias Repila / Nicolas Pirola]
-//! @brief Modulación de amplitud.
-//!
-//! @details
-//! Ecuación Matemática:
-//!
-//! Salida = Audio * Gain(t)
-//!
-//! Gain(t) = 1.0 - Depth * ((LFO / 2) + 0.5)
-//!
-//! Arquitectura:
-//! Se utiliza una FSM para multiplexar en el tiempo un unico multiplicador de 32x32 bits
-//! (4 bloques DSP48).
+// fx_tremolo.sv
+// Tremolo: modulacion de amplitud con un LFO triangular.
+//
+// y[n] = x[n] * g[n]
+// g[n] = 1 - d/2 * (l[n] + 1)
+//
+// Un multiplicador de 32x32 bits (mul32_seq, 1 DSP48) compartido por una FSM.
 
 module fx_tremolo(
-    input logic                clk              , //! Clock
-    input logic                rst_n            , //! Reset
-    input logic                enable           , //! Enable efecto
+    input  logic               clk,
+    input  logic               rst_n,
+    input  logic               enable,
 
-    output logic               in_ready        ,
-    input  logic               in_valid         ,
-    input  logic signed [31:0] in_data          ,  //! Formato Q3.29
+    input  logic               in_valid,
+    output logic               in_ready,
+    input  logic signed [31:0] in_data,
 
-    output logic               out_valid        ,
-    input  logic               out_ready        ,
-    output logic signed[31:0]  out_data         , //! Formato Q3.29
+    output logic               out_valid,
+    input  logic               out_ready,
+    output logic signed [31:0] out_data,
 
-    input logic signed[31:0]   depth_q1_31      , //! Profundidad del LFO (PS)
-    input logic [31:0]         lfo_phase_inc_u32 //! Rate (PS)
+    input  logic signed [31:0] depth_q1_31,
+    input  logic        [31:0] lfo_phase_inc_u32
 );
 
     import fx_dsp_pkg::*;
@@ -46,7 +38,7 @@ module fx_tremolo(
         ST_SAVE_OUTPUT
     } state_t;
 
-    state_t state; //! Maquina de estados
+    state_t state; //maquina de estados
 
     logic signed [31:0] sample_reg;
     logic signed [31:0] depth_reg;
@@ -54,7 +46,10 @@ module fx_tremolo(
 
     logic signed [31:0] mul_a_reg;
     logic signed [31:0] mul_b_reg;
-    logic signed [63:0] mul_product_reg;
+    logic               mul_start;
+    logic               mul_busy;
+    logic               mul_valid;
+    logic signed [63:0] mul_p;
 
     logic               out_buf_valid;
     logic signed [31:0] out_buf;
@@ -76,6 +71,17 @@ module fx_tremolo(
     wire enable_rise;
 
     //instancias
+    mul32_seq u_mul (
+        .clk   (clk      ),
+        .rst_n (rst_n    ),
+        .start (mul_start),
+        .a     (mul_a_reg),
+        .b     (mul_b_reg),
+        .busy  (mul_busy ),
+        .valid (mul_valid),
+        .p     (mul_p    )
+    );
+
     fx_lfo_tri u_lfo (
         .clk           (clk              ),
         .rst_n         (rst_n            ),
@@ -112,7 +118,7 @@ module fx_tremolo(
     always_comb begin
         half_lfo = (lfo_reg >>> 1) + 32'sh4000_0000; //lfo/2 + 1/2
         //Se suma 0.5 antes de desplazar para redondear.
-        mul_result = sat32((mul_product_reg + (64'sd1 <<< 30)) >>> 31); //redondeo
+        mul_result = sat32((mul_p + (64'sd1 <<< 30)) >>> 31); //redondeo
         gain_next  = sat_sub32( UNO_Q1_31, mul_result);
     end
 
@@ -137,14 +143,12 @@ module fx_tremolo(
 
             mul_a_reg       <= '0;
             mul_b_reg       <= '0;
-            mul_product_reg <= '0;
+            mul_start       <= 1'b0;
         end
         else begin
             if(out_fire) out_buf_valid <= 1'b0;
 
-            if((state == ST_MUL_GAIN) || (state == ST_MUL_AUDIO)) begin
-                mul_product_reg <= $signed(mul_a_reg) * $signed(mul_b_reg);
-            end
+            mul_start <= 1'b0; //pulso de un ciclo
 
             if(bypass_mode)begin
                 state <= ST_IDLE;
@@ -166,25 +170,27 @@ module fx_tremolo(
                     end
 
                     ST_LOAD_GAIN: begin
-                        mul_a_reg <= depth_reg;
-                        mul_b_reg <= half_lfo;
-                        state <= ST_MUL_GAIN;
+                        if(!mul_busy) begin
+                            mul_a_reg <= depth_reg;
+                            mul_b_reg <= half_lfo;
+                            mul_start <= 1'b1;
+                            state <= ST_MUL_GAIN;
+                        end
                     end
 
                     ST_MUL_GAIN: begin
-                        state <= ST_LOAD_AUDIO;
+                        if(mul_valid) state <= ST_LOAD_AUDIO;
                     end
 
                     ST_LOAD_AUDIO:begin
-
                         mul_a_reg <= sample_reg;
                         mul_b_reg <= gain_next;
-
+                        mul_start <= 1'b1;
                         state <= ST_MUL_AUDIO;
                     end
 
                     ST_MUL_AUDIO: begin
-                        state <= ST_SAVE_OUTPUT;
+                        if(mul_valid) state <= ST_SAVE_OUTPUT;
                     end
 
                     ST_SAVE_OUTPUT: begin

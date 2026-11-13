@@ -2,7 +2,7 @@
 //Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 //--------------------------------------------------------------------------------
 //Tool Version: Vivado v.2025.1 (win64) Build 6140274 Thu May 22 00:12:29 MDT 2025
-//Date        : Fri Sep 18 20:00:29 2026
+//Date        : Fri Oct 30 21:01:41 2026
 //Host        : DESKTOP-FLN9N0C running 64-bit major release  (build 9200)
 //Command     : generate_target design_1.bd
 //Design      : design_1
@@ -604,13 +604,13 @@ module design_1
         .S02_AXI_wstrb(1'b0),
         .S02_AXI_wvalid(1'b0));
   design_1_axi_quad_spi_0_0 axi_quad_spi_0
-       (.ext_spi_clk(mclk_out_adc),
+       (.ext_spi_clk(processing_system7_0_FCLK_CLK0),
         .io0_i(ilconstant_1_dout),
         .io0_o(io0_o_0),
         .io1_i(ilconstant_1_dout),
-        .s_axi_aclk(mclk_out_adc),
+        .s_axi_aclk(processing_system7_0_FCLK_CLK0),
         .s_axi_araddr(axi_smc_M06_AXI_ARADDR),
-        .s_axi_aresetn(proc_sys_reset_0_peripheral_aresetn),
+        .s_axi_aresetn(rst_ps7_0_100M_peripheral_aresetn),
         .s_axi_arready(axi_smc_M06_AXI_ARREADY),
         .s_axi_arvalid(axi_smc_M06_AXI_ARVALID),
         .s_axi_awaddr(axi_smc_M06_AXI_AWADDR),
@@ -787,7 +787,6 @@ module design_1
         .S00_AXI_wstrb(processing_system7_0_M_AXI_GP0_WSTRB),
         .S00_AXI_wvalid(processing_system7_0_M_AXI_GP0_WVALID),
         .aclk(processing_system7_0_FCLK_CLK0),
-        .aclk1(mclk_out_adc),
         .aresetn(rst_ps7_0_100M_peripheral_aresetn));
   design_1_axi_stream_looper_mi_0_0 axi_stream_looper_mi_0
        (.clk(processing_system7_0_FCLK_CLK0),

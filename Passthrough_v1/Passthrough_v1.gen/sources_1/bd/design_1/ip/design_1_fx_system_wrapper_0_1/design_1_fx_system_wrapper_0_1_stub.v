@@ -2,10 +2,10 @@
 // Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 // --------------------------------------------------------------------------------
 // Tool Version: Vivado v.2025.1 (win64) Build 6140274 Thu May 22 00:12:29 MDT 2025
-// Date        : Fri Sep 18 20:04:40 2026
+// Date        : Fri Oct 30 21:05:13 2026
 // Host        : DESKTOP-FLN9N0C running 64-bit major release  (build 9200)
 // Command     : write_verilog -force -mode synth_stub
-//               x:/Tesis/Passthrough_v1/Passthrough_v1.gen/sources_1/bd/design_1/ip/design_1_fx_system_wrapper_0_1/design_1_fx_system_wrapper_0_1_stub.v
+//               x:/Entrega_Tesis/Passthrough_v1/Passthrough_v1.gen/sources_1/bd/design_1/ip/design_1_fx_system_wrapper_0_1/design_1_fx_system_wrapper_0_1_stub.v
 // Design      : design_1_fx_system_wrapper_0_1
 // Purpose     : Stub declaration of top-level module interface
 // Device      : xc7z020clg400-1

@@ -2,10 +2,10 @@
 // Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 // --------------------------------------------------------------------------------
 // Tool Version: Vivado v.2025.1 (win64) Build 6140274 Thu May 22 00:12:29 MDT 2025
-// Date        : Wed Sep 30 20:51:31 2026
+// Date        : Wed Sep 30 20:51:28 2026
 // Host        : DESKTOP-FLN9N0C running 64-bit major release  (build 9200)
-// Command     : write_verilog -force -mode synth_stub
-//               x:/Entrega_Tesis/Passthrough_v1/Passthrough_v1.gen/sources_1/bd/design_1/ip/design_1_axi_smc_2/design_1_axi_smc_2_stub.v
+// Command     : write_verilog -force -mode synth_stub -rename_top design_1_axi_smc_2 -prefix
+//               design_1_axi_smc_2_ design_1_axi_smc_2_stub.v
 // Design      : design_1_axi_smc_2
 // Purpose     : Stub declaration of top-level module interface
 // Device      : xc7z020clg400-1

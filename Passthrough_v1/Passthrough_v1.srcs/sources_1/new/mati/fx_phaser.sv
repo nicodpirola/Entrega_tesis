@@ -1,19 +1,14 @@
-//! @title Efecto Phaser
-//! @file fx_phaser.sv
-//! @author [Matias Repila / Nicolas Pirola]
-//! @brief Phaser de cuatro etapas all-pass.
-//!
-//! @details
-//! Usamos filtro TPT, ecuaciones del libro:
-//!
-//! v  = (x - s) * G
-//! ap = s + v
-//! s  = ap + v
-//! y  = 2 * ap - x
-//!
-//! La FSM multiplexa en el tiempo un unico multiplicador de 32x32 bits
-//! para calcular G, el feedback y las cuatro etapas all-pass.
-//!
+// fx_phaser.sv
+// Phaser de cuatro etapas all-pass.
+//
+// Filtro TPT, ecuaciones del libro:
+// v  = (x - s) * G
+// ap = s + v
+// s  = ap + v
+// y  = 2 * ap - x
+//
+// La FSM multiplexa en el tiempo un unico multiplicador de 32x32 bits
+// para calcular G, el feedback y las cuatro etapas all-pass.
 
 module fx_phaser (
     input  logic               clk,
@@ -28,13 +23,16 @@ module fx_phaser (
     input  logic               out_ready,
     output logic signed [31:0] out_data,
 
-    input  logic        [31:0] lfo_phase_inc,
+    input  logic        [31:0] lfo_phase_inc_u32,
     input  logic signed [31:0] g_min_q1_31,
     input  logic signed [31:0] g_max_q1_31,
     input  logic signed [31:0] fb_q1_31
 );
 
     import fx_dsp_pkg::*;
+
+    localparam logic signed [31:0] G_MAX_Q31  = 32'sh4000_0000; // G = g/(1+g) < 0.5 hasta fs/4
+    localparam logic signed [31:0] FB_MAX_Q31 = 32'sh7333_3333; // 0.9
 
     typedef enum logic [3:0] {
         ST_IDLE,
@@ -76,6 +74,10 @@ module fx_phaser (
     logic signed [31:0] mul_b_reg;
     logic signed [63:0] mul_product_reg;
 
+    logic signed [31:0] g_min_eff;
+    logic signed [31:0] g_max_eff;
+    logic signed [31:0] fb_eff;
+
     logic signed [31:0] lfo_unipolar;
     logic signed [31:0] g_range;
     logic signed [31:0] mul_result;
@@ -94,6 +96,7 @@ module fx_phaser (
     logic               enable_d;
 
     wire enable_rise;
+    wire bypass_mode;
     wire can_accept;
     wire in_fire;
     wire out_fire;
@@ -102,22 +105,46 @@ module fx_phaser (
         .clk           (clk),
         .rst_n         (rst_n),
         .tick          (lfo_tick),
-        .phase_inc_u32 (lfo_phase_inc),
+        .phase_inc_u32 (lfo_phase_inc_u32),
         .phase_clear   (lfo_clear),
         .lfo_q1_31     (lfo_q1_31)
     );
 
     assign enable_rise = enable && !enable_d;
+    assign bypass_mode = !enable;
     assign can_accept  = (state == ST_IDLE) && !out_buf_valid && !enable_rise;
-    assign in_fire     = in_valid && in_ready && enable;
+    assign in_fire     = in_valid && in_ready;
     assign out_fire    = out_valid && out_ready;
 
-    assign lfo_tick  = in_fire;
+    assign lfo_tick  = in_fire && !bypass_mode;
     assign lfo_clear = enable_rise;
 
-    assign in_ready  = enable ? can_accept    : out_ready;
-    assign out_valid = enable ? out_buf_valid : in_valid;
-    assign out_data  = enable ? out_buf       : in_data;
+    assign in_ready  = can_accept;
+    assign out_valid = out_buf_valid;
+    assign out_data  = out_buf;
+
+    always_comb begin
+        if (g_min_q1_31 < 32'sd0)
+            g_min_eff = 32'sd0;
+        else if (g_min_q1_31 > G_MAX_Q31)
+            g_min_eff = G_MAX_Q31;
+        else
+            g_min_eff = g_min_q1_31;
+
+        if (g_max_q1_31 < 32'sd0)
+            g_max_eff = 32'sd0;
+        else if (g_max_q1_31 > G_MAX_Q31)
+            g_max_eff = G_MAX_Q31;
+        else
+            g_max_eff = g_max_q1_31;
+
+        if (fb_q1_31 > FB_MAX_Q31)
+            fb_eff = FB_MAX_Q31;
+        else if (fb_q1_31 < -FB_MAX_Q31)
+            fb_eff = -FB_MAX_Q31;
+        else
+            fb_eff = fb_q1_31;
+    end
 
     always_comb begin
         lfo_unipolar = (lfo_reg >>> 1) + 32'sh4000_0000;
@@ -188,7 +215,6 @@ module fx_phaser (
                 ap_state_2         <= '0;
                 ap_state_3         <= '0;
                 feedback_reg       <= '0;
-                out_buf_valid      <= 1'b0;
             end else begin
                 if ((state == ST_MUL_G) ||
                     (state == ST_MUL_FB) ||
@@ -202,13 +228,18 @@ module fx_phaser (
                 case (state)
                     ST_IDLE: begin
                         if (in_fire) begin
-                            sample_reg       <= in_data;
-                            lfo_reg          <= lfo_q1_31;
-                            g_min_reg        <= g_min_q1_31;
-                            g_max_reg        <= g_max_q1_31;
-                            feedback_cfg_reg <= fb_q1_31;
-                            stage_index      <= 2'd0;
-                            state            <= ST_LOAD_G;
+                            if (bypass_mode) begin
+                                out_buf       <= in_data;
+                                out_buf_valid <= 1'b1;
+                            end else begin
+                                sample_reg       <= in_data;
+                                lfo_reg          <= lfo_q1_31;
+                                g_min_reg        <= g_min_eff;
+                                g_max_reg        <= g_max_eff;
+                                feedback_cfg_reg <= fb_eff;
+                                stage_index      <= 2'd0;
+                                state            <= ST_LOAD_G;
+                            end
                         end
                     end
 

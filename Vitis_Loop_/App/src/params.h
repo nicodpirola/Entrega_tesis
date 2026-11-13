@@ -29,6 +29,8 @@ typedef struct {
     float dly_time;
     float dly_fb;
     float dly_wet;
+    float dly_tone_hz;  // Frecuencia de corte del filtro pasabajos (Hz)
+    int dly_lpf_on;     // 1 = pasabajos encendido en el feedback del delay
     float ph_rate;      // Hz del LFO
     float ph_fmin;      // Hz, extremo inferior del barrido
     float ph_fmax;      // Hz, extremo superior del barrido

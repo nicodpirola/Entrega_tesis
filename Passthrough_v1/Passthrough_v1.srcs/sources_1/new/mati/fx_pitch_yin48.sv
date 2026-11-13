@@ -37,7 +37,8 @@
 module fx_pitch_yin48 #(
     parameter int N          = 2,      // carriles: 1, 2 o 4
     parameter int THETA_NUM  = 19,     // umbral theta = THETA_NUM / 128
-    parameter int TAU_MIN    = 6,      // 48000 / 6   = 8 kHz
+    parameter int TAU_MIN    = 6,      // perfil theremin: 48000 / 6  = 8 kHz
+    parameter int TAU_MIN_GUIT = 32,   // perfil guitarra: 48000 / 32 = 1,5 kHz (evita pozos falsos por el ruido de la pua)
     parameter int TAU_MAX    = 800,    // 48000 / 800 = 60 Hz (multiplo de N)
     parameter int HOP        = 16      // una busqueda cada HOP muestras (3 kHz)
 )(
@@ -71,7 +72,7 @@ initial begin
     if (!(N == 1 || N == 2 || N == 4)) $fatal(1, "fx_pitch_yin48: N tiene que ser 1, 2 o 4");
     if (TAU_MAX % N != 0)              $fatal(1, "fx_pitch_yin48: TAU_MAX tiene que ser multiplo de N");
     if (THETA_NUM < 1 || THETA_NUM > 31) $fatal(1, "fx_pitch_yin48: THETA_NUM fuera de rango (1..31)");
-    if (TAU_MAX > 800 || TAU_MIN < 2)  $fatal(1, "fx_pitch_yin48: TAU_MIN/TAU_MAX fuera de rango");
+    if (TAU_MAX > 800 || TAU_MIN < 2 || TAU_MIN_GUIT < 2) $fatal(1, "fx_pitch_yin48: TAU_MIN/TAU_MAX fuera de rango");
 end
 
 // =============================================================================
@@ -680,7 +681,7 @@ always_ff @(posedge clk) begin : srch_pipe
         dh9[j]   <= dh8[j];
         dh10[j]  <= dh9[j];
         // c11
-        hit11[j] <= (p_tau[9][j] >= LANE_W'(TAU_MIN)) && ((57'(cl10[j]) << 7) < rhs10[j]);
+        hit11[j] <= (p_tau[9][j] >= (perfil_r ? LANE_W'(TAU_MIN) : LANE_W'(TAU_MIN_GUIT))) && ((57'(cl10[j]) << 7) < rhs10[j]);
         dh11[j]  <= dh10[j];
         cl11[j]  <= cl10[j];
         sk11[j]  <= sk10[j];

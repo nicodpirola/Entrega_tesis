@@ -162,7 +162,7 @@ fx_phaser u_phaser(
     .out_ready        (out_ready),
     .out_data         (out_data),
 
-    .lfo_phase_inc    (phaser_cfg.rate_inc_u32),
+    .lfo_phase_inc_u32(phaser_cfg.rate_inc_u32),
 
     .g_min_q1_31      (phaser_cfg.g_min_q1_31),
     .g_max_q1_31      (phaser_cfg.g_max_q1_31),

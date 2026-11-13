@@ -11,16 +11,16 @@ module fx_lfo_tri (
   input  logic         clk,
   input  logic         rst_n,
 
-  input  logic         tick,            // avanzar 1 paso (por muestra aceptada)
-  input  logic [31:0]  phase_inc_u32,   // incremento DDS
-  input  logic         phase_clear,     // opcional
+  input  logic         tick,            //avanzar 1 paso (por muestra aceptada)
+  input  logic [31:0]  phase_inc_u32,   //incremento DDS
+  input  logic         phase_clear,     //opcional
 
   output logic signed [31:0] lfo_q1_31
 );
 
   logic [31:0] phase; //contador
 
-  // triangular unipolar 
+  //triangular unipolar
   logic [30:0] tri_u31;
 
   always_ff @(posedge clk or negedge rst_n) begin
@@ -35,20 +35,19 @@ module fx_lfo_tri (
     end
   end
 
-  // Construcción triángulo:
-  // MSB de phase define subida/bajada, usamos 31 LSB.
+  //construcción triángulo
+  //MSB de phase define subida/bajada, usamos 31 LSB.
   always_comb begin
     if (phase[31] == 1'b0) tri_u31 = phase[30:0];
     else                   tri_u31 = ~phase[30:0];
   end
 
-  // Unipolar->bipolar:
-  // lfo = 2*tri_u31 - 2^31
-  // Nota: esto da aproximadamente [-1, +1).
+  //unipolar -> bipolar: lfo = 2*(tri - 0.5)
+  //tri en [0,1) -> tri - 0.5 en [-0.5, 0.5) -> x2 en [-1, 1). Sin desborde.
   always_comb begin
-    logic signed [31:0] tmp;
-    tmp = $signed({1'b0, tri_u31}) <<< 1;       // [0 .. ~2^32)
-    lfo_q1_31 = tmp - 32'sh8000_0000;          // centrar
+    logic signed [31:0] centrado;
+    centrado  = $signed({1'b0, tri_u31}) - 32'sh4000_0000;//resta 0.5
+    lfo_q1_31 = centrado <<< 1;//multiplica por 2
   end
 
 endmodule

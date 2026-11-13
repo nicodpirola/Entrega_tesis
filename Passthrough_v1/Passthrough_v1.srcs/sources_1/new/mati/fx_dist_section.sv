@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
-//! @title Seccion de overdrive
-//! @brief Parametros agrupados, commit coordinado por fx_core y carga de tabla por AXI.
+// fx_dist_section.sv
+// Seccion de overdrive: parametros agrupados, commit coordinado por fx_core y carga de tabla por AXI.
 module fx_dist_section (
     input logic clk, rst_n, enable,
     input logic cfg_apply, output logic cfg_ready,

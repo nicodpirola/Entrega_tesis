@@ -1,7 +1,9 @@
 `timescale 1ns/1ps
-//! @title Tono y acoplamiento de salida del overdrive
-//! @brief Biquad DF-I y pasaaltos TPT con un multiplicador compartido de 32x32 bits.
-//! Audio Q3.29, tono Q2.30, coeficiente del pasaaltos Q1.31 y memoria Q5.27.
+// fx_od_tone.sv
+// Tono y acoplamiento de salida del overdrive: biquad DF-I y pasaaltos TPT.
+//
+// Audio Q3.29, tono Q2.30, coeficiente del pasaaltos Q1.31 y memoria Q5.27.
+// Un multiplicador de 32x32 bits compartido.
 module fx_od_tone #(
     parameter integer HP_SALIDA = 0
 )(

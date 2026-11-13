@@ -1,7 +1,9 @@
 `timescale 1ns/1ps
-//! @title Overdrive simplificado de Yeh
-//! @brief HP entrada -> sobremuestreo -> rama/diodos + directo -> tono -> HP salida -> reduccion -> Level.
-//! Audio Q3.29. Parametros aplicados juntos con la cadena vacia. No incluye AXI ni suavizado de Drive.
+// fx_overdrive.sv
+// Overdrive simplificado de Yeh.
+//
+// HP entrada -> sobremuestreo -> rama/diodos + directo -> tono -> HP salida -> reduccion -> Level.
+// Audio Q3.29. Parametros aplicados juntos con la cadena vacia. No incluye AXI ni suavizado de Drive.
 module fx_overdrive #(
     parameter integer OS_FACTOR = 8,
     parameter string TABLE_FILE = ""

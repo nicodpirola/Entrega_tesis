@@ -142,12 +142,12 @@ effect_module_t effects_list[MAX_EFFECTS] = {
     {
         .name = "Delay",
         .enabled = 0,
-        .param_count = 3,
+        .param_count = 4,
         .params = {
             {"Time(ms)", 10, 680, 250},
             {"FB(%)",    0, 90,  35},
             {"Wet(%)",   0, 100, 25},
-            {"-",        0, 0,   0}
+            {"Tone(Hz)", 500, 10000, 3000}
         }
     },
     {
@@ -243,6 +243,8 @@ static void ui_apply_all_params(void) {
     p.dly_time = (float)effects_list[UI_DELAY].params[0].current_val;
     p.dly_fb   = (float)effects_list[UI_DELAY].params[1].current_val / 100.0f;
     p.dly_wet  = (float)effects_list[UI_DELAY].params[2].current_val / 100.0f;
+    p.dly_tone_hz = (float)effects_list[UI_DELAY].params[3].current_val;
+    p.dly_lpf_on  = 1;
 
     // Cab
     uint32_t cab_q1_31 = (uint32_t)(((uint64_t)effects_list[UI_CAB].params[0].current_val * 0x7FFFFFFFu) / 100u);

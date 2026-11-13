@@ -231,7 +231,7 @@ void params_init(params_t *p) {
     p->cho_center = 15.0f; p->cho_depth = 1.5f; p->cho_rate = 0.4f; p->cho_wet = 0.5f;
     p->fl_center = 3.0f; p->fl_depth = 2.0f; p->fl_rate = 0.4f; p->fl_fb = 0.5f; p->fl_wet = 0.5f;
     p->trem_rate = 5.0f; p->trem_depth = 0.5f;
-    p->dly_time = 300.0f; p->dly_fb = 0.4f; p->dly_wet = 0.5f;
+    p->dly_time = 300.0f; p->dly_fb = 0.4f; p->dly_wet = 0.5f; p->dly_tone_hz = 3000.0f; p->dly_lpf_on = 1;
     /* Phaser: mismos valores que el reset del RTL (1 Hz, 300-1600 Hz, FB 0.3) */
     p->ph_rate = 1.0f; p->ph_fmin = 300.0f; p->ph_fmax = 1600.0f; p->ph_fb = 0.3f;
     p->syn_osc1_mode = FX_OSC1_SAW_UP; p->syn_osc2_wave = FX_OSC2_SAW_UP;
@@ -275,10 +275,11 @@ void params_push_to_pl(const params_t *p) {
     fx_hw_write(FX_BASE, FX_REG_PHASER_GMIN, cutoff_to_tpt_g(p->ph_fmin));
     fx_hw_write(FX_BASE, FX_REG_PHASER_GMAX, cutoff_to_tpt_g(p->ph_fmax));
     fx_hw_write(FX_BASE, FX_REG_PHASER_FB, float_to_q1_31(p->ph_fb));
-    fx_hw_write(FX_BASE, FX_REG_DELAY_CTRL, 0u);
+    fx_hw_write(FX_BASE, FX_REG_DELAY_CTRL, p->dly_lpf_on ? 1u : 0u);
     fx_hw_write(FX_BASE, FX_REG_DELAY_TIME, ms_to_samples_q16_16(p->dly_time));
     fx_hw_write(FX_BASE, FX_REG_DELAY_FB, float_to_q1_31(p->dly_fb));
     fx_hw_write(FX_BASE, FX_REG_DELAY_WET, float_to_q1_31(p->dly_wet));
+    fx_hw_write(FX_BASE, FX_REG_DELAY_LPF_G, cutoff_to_tpt_g(p->dly_tone_hz));
     write_synth(p);
     fx_hw_commit(FX_BASE);
 }
