@@ -511,9 +511,9 @@
 
 /** Add a custom handler when assert happens e.g. to restart MCU. */
 #define LV_ASSERT_HANDLER_INCLUDE <stdint.h>
-#define LV_ASSERT_HANDLER { extern void ili9341_fill_rect(uint16_t, uint16_t, uint16_t, uint16_t, uint16_t); \
-                            ili9341_fill_rect(0, 60, 320, 20, 0xF800); \
-                            while(1); }
+#define LV_ASSERT_HANDLER { extern void xil_printf(const char *fmt, ...); \
+                            xil_printf("[LVGL] ASSERT %s:%d\r\n", __FILE__, __LINE__); \
+                            while(1); }     /**< Avisa por UART y se detiene */
 
 /*-------------
  * Check arg

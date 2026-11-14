@@ -57,9 +57,8 @@
 #define FX_REG_SYNTH_BUS_TRIM    0x24Cu
 #define FX_REG_SYNTH_MIX_STATUS  0x250u
 #define FX_REG_SYNTH_SVF_CTRL    0x280u
-#define FX_REG_SYNTH_SVF_A1      0x284u
-#define FX_REG_SYNTH_SVF_A2      0x288u
-#define FX_REG_SYNTH_SVF_A3      0x28Cu
+#define FX_REG_SYNTH_SVF_TRACK   0x284u   // corte en multiplos de la nota, Q5.27
+#define FX_REG_SYNTH_SVF_CONTOUR 0x288u   // cuanto abre el volumen el filtro, Q3.29
 #define FX_REG_SYNTH_SVF_K       0x290u
 #define FX_REG_SYNTH_SVF_DRIVE   0x294u
 #define FX_REG_SYNTH_OUT_CTRL    0x2C0u

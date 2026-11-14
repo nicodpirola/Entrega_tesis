@@ -780,7 +780,7 @@ logic synth_valid;
 
 logic signed [31:0] synth_sample;
 
-synth_hw_test u_synth(
+synth_core u_synth(
     .clk                  (clk),
     .rst_n                (rst_n),
 
@@ -825,9 +825,8 @@ synth_hw_test u_synth(
     .mix_k2_q1_31         (32'sh0000_0000),
 
     .svf_ctrl             (synth_svf_ctrl_effective),
-    .svf_a1_q1_31         (synth_svf_cfg.a1_q1_31),
-    .svf_a2_q1_31         (synth_svf_cfg.a2_q1_31),
-    .svf_a3_q1_31         (synth_svf_cfg.a3_q1_31),
+    .svf_track_q5_27      (synth_svf_cfg.track_q5_27),
+    .svf_contour_q3_29    (synth_svf_cfg.contour_q3_29),
     .svf_k_q3_29          (synth_svf_cfg.k_q3_29),
 
     .vca_gain_q1_31       (synth_vca_gain),

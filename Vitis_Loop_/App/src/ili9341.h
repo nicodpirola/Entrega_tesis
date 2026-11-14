@@ -8,13 +8,19 @@
 #define ILI9341_SPI_BASEADDR    XPAR_AXI_QUAD_SPI_0_BASEADDR
 #define ILI9341_GPIO_DEVICE_ID  0
 
-// EMIO GPIO pins (Intercambiados para probar si los cables están invertidos)
-#define ILI9341_DC_PIN          54   // Era 55, ahora prueba con EMIO[0] (Pin IO3)
-#define ILI9341_RST_PIN         55   // Era 54, ahora prueba con EMIO[1] (Pin IO2)
+// Chassis: EMIO[0] -> U12 (DC), EMIO[1] -> U13 (RESET).
+#define ILI9341_DC_PIN          54   // GPIO_tri_io[0]
+#define ILI9341_RST_PIN         55   // GPIO_tri_io[1]
 
 // ── Dimensiones ─────────────────────────────────────────────
 #define ILI9341_WIDTH           320
 #define ILI9341_HEIGHT          240
+
+/* Landscape rotations: use 0xE8 instead if the image is 180 degrees inverted. */
+/* Orientation validated in the original display/encoder project. */
+#define ILI9341_MADCTL_LANDSCAPE          0x28
+#define ILI9341_MADCTL_LANDSCAPE_FLIPPED  0xE8
+#define ILI9341_MADCTL_VALUE              ILI9341_MADCTL_LANDSCAPE
 
 // ── Colores RGB565 ──────────────────────────────────────────
 #define COLOR_BLACK             0x0000
@@ -42,10 +48,10 @@
 int  ili9341_init(void);
 void ili9341_test_gpio(void);
 void ili9341_fill_screen(u16 color);
+void ili9341_test_pattern(void);
 void ili9341_fill_rect(u16 x, u16 y, u16 w, u16 h, u16 color);
 void ili9341_draw_pixel(u16 x, u16 y, u16 color);
 void ili9341_flush_region(u16 x1, u16 y1, u16 x2, u16 y2, const u8 *data);
-void ili9341_test_pattern(void);
 
 
 

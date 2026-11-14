@@ -99,12 +99,11 @@ localparam logic [11:0] REG_NOISE_LEVEL      = 12'h248;
 localparam logic [11:0] REG_SYNTH_BUS_TRIM   = 12'h24C;
 localparam logic [11:0] REG_SYNTH_MIX_STATUS = 12'h250;
 
-// Synth SVF
-localparam logic [11:0] REG_SYNTH_SVF_CTRL   = 12'h280;
-localparam logic [11:0] REG_SYNTH_SVF_A1     = 12'h284;
-localparam logic [11:0] REG_SYNTH_SVF_A2     = 12'h288;
-localparam logic [11:0] REG_SYNTH_SVF_A3     = 12'h28C;
-localparam logic [11:0] REG_SYNTH_SVF_K      = 12'h290;
+// Synth SVF (pasabajos, coeficientes calculados en la FPGA)
+localparam logic [11:0] REG_SYNTH_SVF_CTRL    = 12'h280;
+localparam logic [11:0] REG_SYNTH_SVF_TRACK   = 12'h284;   //corte en multiplos de la nota, Q5.27
+localparam logic [11:0] REG_SYNTH_SVF_CONTOUR = 12'h288;   //cuanto abre el volumen el filtro, Q3.29
+localparam logic [11:0] REG_SYNTH_SVF_K       = 12'h290;
 localparam logic [11:0] REG_SYNTH_SVF_DRIVE  = 12'h294;
 
 // Synth output
@@ -294,9 +293,8 @@ typedef struct packed {
 
 typedef struct packed {
     logic [31:0] ctrl;
-    logic signed [31:0] a1_q1_31;
-    logic signed [31:0] a2_q1_31;
-    logic signed [31:0] a3_q1_31;
+    logic signed [31:0] track_q5_27;
+    logic signed [31:0] contour_q3_29;
     logic signed [31:0] k_q3_29;
     logic [31:0] drive;
 } synth_svf_cfg_t;

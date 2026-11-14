@@ -1,46 +1,251 @@
 #include "params.h"
-#include "fx_regmap.h"
 #include "xil_io.h"
 #include "xil_printf.h"
 #include <float.h>
 #include <math.h>
 #include <string.h>
-#include <stdint.h>
 
-#define CAB_IR_BANK_DATA
-#include "cab_ir_bank.h"
+/* =========================================================================
+ * HAL de hardware AXI-Lite (fx_hw)
+ * ========================================================================= */
 
-/* -------------------------------------------------------------------------
- * Primitivas de comunicacion AXI-Lite (HAL de hardware)
- * ------------------------------------------------------------------------- */
-static inline u32 fx_hw_read(UINTPTR base, u32 offset) {
+u32 fx_hw_read(UINTPTR base, u32 offset) {
     return Xil_In32(base + offset);
 }
 
-static inline void fx_hw_write(UINTPTR base, u32 offset, u32 value) {
+void fx_hw_write(UINTPTR base, u32 offset, u32 value) {
     Xil_Out32(base + offset, value);
 }
 
-static inline void fx_hw_update_bits(UINTPTR base, u32 offset, u32 mask, u32 value) {
+void fx_hw_update_bits(UINTPTR base, u32 offset, u32 mask, u32 value) {
     u32 current = fx_hw_read(base, offset);
     fx_hw_write(base, offset, (current & ~mask) | (value & mask));
 }
 
-static inline void fx_hw_commit(UINTPTR base) {
+void fx_hw_commit(UINTPTR base) {
     fx_hw_write(base, FX_REG_CORE_COMMAND, FX_COMMAND_COMMIT);
 }
 
-static inline int fx_hw_probe(UINTPTR base) {
+int fx_hw_probe(UINTPTR base) {
     return (fx_hw_read(base, FX_REG_CORE_ID) == FX_CORE_ID_VALUE) &&
            (fx_hw_read(base, FX_REG_CORE_VERSION) == FX_CORE_VERSION_VALUE);
 }
 
-/* -------------------------------------------------------------------------
- * Simulador de gabinete (Cabsim / Respuestas al impulso BRAM)
- * ------------------------------------------------------------------------- */
+void fx_hw_frontend_clear(UINTPTR base) {
+    u32 ctrl = fx_hw_read(base, FX_REG_FRONTEND_CTRL);
+    fx_hw_write(base, FX_REG_FRONTEND_CTRL, ctrl | FX_FRONTEND_CLEAR);
+}
+
+/* =========================================================================
+ * Generacion de tabla de diodos del overdrive (fx_od)
+ * ========================================================================= */
+
+#define OD_PI 3.14159265358979323846
+#define OD_FS 48000.0
+#define OD_TABLE_CHUNK 128u
+#define OD_DRIVE_SETTLE_MS 60u
+#define OD_COMMIT_TIMEOUT_MS 1000u
+
+enum { OD_IDLE, OD_LOADING, OD_COMMIT };
+typedef struct { double drive, tone, level; } od_parameters_t;
+static od_parameters_t od_wanted;
+static u32 od_revision, od_applied_revision, od_pending_revision;
+static u32 od_load_index, od_load_bank, od_pending_bank, od_commit_ms, od_drive_changed_ms;
+static unsigned od_factor;
+static double od_load_drive, od_seen_drive, od_bank_drive[2];
+static int od_state, od_checked, od_failed, od_bank_valid[2], od_have_applied;
+
+static double od_limit(double x, double low, double high) {
+    return x < low ? low : (x > high ? high : x);
+}
+
+static int od_quantize(double x, int fractional_bits, u32 *word) {
+    double scaled = ldexp(x, fractional_bits);
+    double rounded;
+    if (!isfinite(scaled)) return -1;
+    rounded = scaled < 0.0 ? -floor(-scaled + 0.5) : floor(scaled + 0.5);
+    if (rounded < -2147483648.0 || rounded > 2147483647.0) return -1;
+    *word = (u32)(s32)rounded;
+    return 0;
+}
+
+int fx_od_coefficients(double drive, double tone, double level, unsigned os_factor,
+                       double sensitivity, u32 words[12]) {
+    double fs, r2, wz, wc, rl, rr, parallel, y, w, wp, x, k;
+    double b1, b0, a1, a0, c, den;
+    double coeff[12];
+    static const int bits[12] = {31,31,31,31,23,30,30,30,30,30,31,29};
+    if (!words || !isfinite(drive) || !isfinite(tone) || !isfinite(level) ||
+        !isfinite(sensitivity) || drive < 0.0 || drive > 1.0 ||
+        tone < 0.0 || tone > 1.0 || level < 0.0 || level >= 4.0 ||
+        sensitivity <= 0.0 || (os_factor != 2 && os_factor != 4 && os_factor != 8)) return -1;
+    fs = OD_FS * os_factor;
+    r2 = 51000.0 + 500000.0 * drive;
+    wz = 1.0 / (4700.0 * 47e-9);
+    wc = 1.0 / (r2 * 51e-12);
+    coeff[0] = (2.0 * OD_PI * 15.9) / (2.0 * OD_FS + 2.0 * OD_PI * 15.9);
+    coeff[1] = (2.0 * OD_PI * 15.6) / (2.0 * OD_FS + 2.0 * OD_PI * 15.6);
+    coeff[2] = wz / (2.0 * fs + wz);
+    coeff[3] = wc / (2.0 * fs + wc);
+    coeff[4] = (r2 / 4700.0) * sensitivity;
+    rl = 20000.0 * tone; rr = 20000.0 * (1.0 - tone);
+    parallel = rl * rr / (rl + rr);
+    y = (rl + rr) * (220.0 + parallel);
+    w = y / (rl * 1000.0 + y);
+    wz = 1.0 / (0.22e-6 * (220.0 + parallel));
+    wp = 1.0 / (0.22e-6 * (1000.0 * 10000.0 / 11000.0));
+    x = rr / (rl + rr) * wz;
+    k = (rl * 1000.0 + y) / (y * 1000.0 * 0.22e-6);
+    b1 = k; b0 = k * w * wz; a1 = wp + wz + x; a0 = wp * wz;
+    c = 2.0 * fs; den = a0 + a1 * c + c * c;
+    coeff[5] = (b0 + b1 * c) / den;
+    coeff[6] = 2.0 * b0 / den;
+    coeff[7] = (b0 - b1 * c) / den;
+    coeff[8] = (2.0 * a0 - 2.0 * c * c) / den;
+    coeff[9] = (a0 - a1 * c + c * c) / den;
+    wc = 1.0 / 0.101;
+    coeff[10] = wc / (2.0 * fs + wc);
+    coeff[11] = level;
+    for (unsigned i = 0; i < 12; ++i)
+        if (od_quantize(coeff[i], bits[i], &words[i]) != 0) return -1;
+    a1 = (double)(s32)words[8] / 1073741824.0;
+    a0 = (double)(s32)words[9] / 1073741824.0;
+    if (fabs(a0) >= 1.0 || 1.0 + a1 + a0 <= 0.0 || 1.0 - a1 + a0 <= 0.0) return -1;
+    return 0;
+}
+
+int fx_od_table_word(u32 index, double drive, double sensitivity, u32 *word) {
+    double u, r2, diode_c, lo, hi, v, f, candidate, exponential, inv;
+    const double vt = 1.752 * 0.02585;
+    u32 node;
+    if (!word || index >= FX_OD_TABLE_DEPTH || !isfinite(drive) ||
+        !isfinite(sensitivity) || drive < 0.0 || drive > 1.0 || sensitivity <= 0.0) return -1;
+    if (index < 128u) node = index << 5;
+    else if (index == 2560u) node = 0x80000000u;
+    else {
+        unsigned exponent = 12u + (index - 128u) / 128u;
+        node = (1u << exponent) + ((index & 127u) << (exponent - 7u));
+    }
+    u = (double)node / 1048576.0;
+    if (u == 0.0) { *word = 0; return 0; }
+    r2 = 51000.0 + 500000.0 * drive;
+    diode_c = 2.0 * r2 * 2.52e-9;
+    lo = 0.0; hi = fmin(u, vt * asinh(u / diode_c)); v = hi;
+    for (unsigned i = 0; i < 80; ++i) {
+        exponential = exp(v / vt); inv = 1.0 / exponential;
+        f = v + 0.5 * diode_c * (exponential - inv) - u;
+        if (fabs(f) <= 1e-12 + 16.0 * DBL_EPSILON * u)
+            return od_quantize(v / sensitivity, 29, word);
+        if (f < 0.0) lo = v; else hi = v;
+        candidate = v - f / (1.0 + 0.5 * diode_c / vt * (exponential + inv));
+        v = candidate >= lo && candidate <= hi ? candidate : 0.5 * (lo + hi);
+    }
+    return -1;
+}
+
+void fx_od_init(void) {
+    memset(&od_wanted, 0, sizeof(od_wanted));
+    od_revision = od_applied_revision = od_pending_revision = 0;
+    od_load_index = od_load_bank = od_pending_bank = od_commit_ms = od_drive_changed_ms = 0;
+    od_factor = 0; od_seen_drive = -1.0; od_load_drive = 0.0;
+    od_state = OD_IDLE; od_checked = od_failed = od_have_applied = 0;
+    od_bank_valid[0] = od_bank_valid[1] = 0;
+}
+
+void fx_od_request(float drive_percent, float tone, float level) {
+    od_parameters_t next;
+    if (!isfinite(drive_percent) || !isfinite(tone) || !isfinite(level)) return;
+    next.drive = od_limit((double)drive_percent / 100.0, 0.0, 1.0);
+    next.tone  = od_limit((double)tone, 0.0, 1.0);
+    next.level = od_limit((double)level, 0.0, 1.0);
+    if (od_revision && od_wanted.drive == next.drive &&
+        od_wanted.tone == next.tone && od_wanted.level == next.level) return;
+    od_wanted = next; ++od_revision;
+}
+
+static void od_fail(int code) {
+    od_failed = 1;
+    xil_printf("[OD] Error %d: revisar VERSION, OD_STATUS y commit.\r\n", code);
+}
+
+static void od_apply(UINTPTR base, u32 bank, u32 now_ms) {
+    u32 words[12];
+    if (fx_od_coefficients(od_wanted.drive, od_wanted.tone, od_wanted.level, od_factor,
+                           FX_OD_INPUT_SENSITIVITY, words) != 0) { od_fail(4); return; }
+    for (u32 i = 0; i < 12; ++i) fx_hw_write(base, FX_REG_OD_INPUT1_G + 4u * i, words[i]);
+    fx_hw_write(base, FX_REG_OD_CTRL, bank);
+    od_pending_bank = bank; od_pending_revision = od_revision; od_commit_ms = now_ms;
+    fx_hw_commit(base); od_state = OD_COMMIT;
+}
+
+void fx_od_service(UINTPTR base, u32 now_ms) {
+    u32 status, active, info, word, count;
+    if (!od_revision || od_failed) return;
+    if (!od_checked) {
+        info = fx_hw_read(base, FX_REG_OD_INFO);
+        od_factor = info & 0xFFu;
+        if (!fx_hw_probe(base) || (info >> 16) != FX_OD_TABLE_DEPTH ||
+            (od_factor != 2 && od_factor != 4 && od_factor != 8)) { od_fail(1); return; }
+        od_checked = 1;
+    }
+    if (od_wanted.drive != od_seen_drive) { od_seen_drive = od_wanted.drive; od_drive_changed_ms = now_ms; }
+    if (od_state == OD_COMMIT) {
+        if (fx_hw_read(base, FX_REG_CORE_STATUS) & 2u) {
+            if ((u32)(now_ms - od_commit_ms) > OD_COMMIT_TIMEOUT_MS) od_fail(2);
+            return;
+        }
+        status = fx_hw_read(base, FX_REG_OD_STATUS);
+        if (((status >> 1) & 1u) != od_pending_bank || !(status & (FX_OD_STATUS_LOADED0 << od_pending_bank))) {
+            od_fail(3); return;
+        }
+        od_applied_revision = od_pending_revision;
+        od_state = OD_IDLE;
+        if (!od_have_applied) xil_printf("[OD] Listo: Yeh, %ux, tabla %u puntos.\r\n", od_factor, FX_OD_TABLE_DEPTH);
+        od_have_applied = 1;
+        return;
+    }
+    if (od_state == OD_LOADING && od_load_drive != od_wanted.drive) od_state = OD_IDLE;
+    if (fx_hw_read(base, FX_REG_CORE_STATUS) & 2u) return;
+    if (od_state == OD_IDLE) {
+        if (od_applied_revision == od_revision) return;
+        status = fx_hw_read(base, FX_REG_OD_STATUS);
+        active = (status >> 1) & 1u;
+        for (u32 i = 0; i < 2; ++i)
+            if (!(status & (FX_OD_STATUS_LOADED0 << i))) od_bank_valid[i] = 0;
+        if (od_bank_valid[active] && od_bank_drive[active] == od_wanted.drive) { od_apply(base, active, now_ms); return; }
+        if (od_have_applied && (u32)(now_ms - od_drive_changed_ms) < OD_DRIVE_SETTLE_MS) return;
+        od_load_bank = active ^ 1u;
+        if (od_bank_valid[od_load_bank] && od_bank_drive[od_load_bank] == od_wanted.drive) { od_apply(base, od_load_bank, now_ms); return; }
+        od_load_drive = od_wanted.drive; od_load_index = 0; od_bank_valid[od_load_bank] = 0;
+        fx_hw_write(base, FX_REG_OD_COMMAND, FX_OD_COMMAND_CLEAR);
+        fx_hw_write(base, FX_REG_DIST_WT_ADDR, FX_OD_WT_ADDR(od_load_bank, 0));
+        od_state = OD_LOADING;
+    }
+    if (od_state != OD_LOADING) return;
+    for (count = 0; count < OD_TABLE_CHUNK && od_load_index < FX_OD_TABLE_DEPTH; ++count, ++od_load_index) {
+        if (fx_od_table_word(od_load_index, od_load_drive, FX_OD_INPUT_SENSITIVITY, &word) != 0) { od_fail(5); return; }
+        fx_hw_write(base, FX_REG_DIST_WT_DATA, word);
+    }
+    status = fx_hw_read(base, FX_REG_OD_STATUS);
+    if (status & FX_OD_STATUS_REJECTED) { od_fail(6); return; }
+    if (od_load_index == FX_OD_TABLE_DEPTH) {
+        if (!(status & (FX_OD_STATUS_LOADED0 << od_load_bank))) { od_fail(7); return; }
+        od_bank_valid[od_load_bank] = 1; od_bank_drive[od_load_bank] = od_load_drive;
+        od_apply(base, od_load_bank, now_ms);
+    }
+}
+
+/* =========================================================================
+ * IRs de gabinete (cab_ir)
+ * ========================================================================= */
+
+#define CAB_IR_BANK_DATA
+#include "cab_ir_bank.h"
+
 static int cab_ir_loaded = -1;
 
-void cab_load_ir(const int32_t *h, int n) {
+void cab_load_ir(const int32_t *h, int n)
+{
     if (n > CAB_IR_TAPS) n = CAB_IR_TAPS;
     Xil_Out32(FX_BASE + FX_REG_CAB_COEF_ADDR, 0u);
     for (int i = 0; i < CAB_IR_TAPS; i++) {
@@ -51,7 +256,8 @@ void cab_load_ir(const int32_t *h, int n) {
     }
 }
 
-void cab_select_ir(int idx) {
+void cab_select_ir(int idx)
+{
     if (idx < 0 || idx >= CAB_IR_COUNT || idx == cab_ir_loaded) return;
     cab_load_ir(CAB_IR_BANK[idx], CAB_IR_TAPS);
     cab_ir_loaded = idx;
@@ -59,11 +265,31 @@ void cab_select_ir(int idx) {
 
 int cab_ir_count(void) { return CAB_IR_COUNT; }
 
-const char *cab_ir_name(int idx) {
+const char *cab_ir_name(int idx)
+{
     return (idx >= 0 && idx < CAB_IR_COUNT) ? CAB_IR_NAMES[idx] : "?";
 }
 
+/* =========================================================================
+ * Calculo de parametros DSP
+ * ========================================================================= */
 
+static param_binding_t dist_params[3], tone_params[2], cho_params[4], fl_params[4];
+static param_binding_t trem_params[2], dly_params[3], syn_mix_params[3], syn_voice_params[3];
+
+static screen_def_t screens[] = {
+    { "DIST", dist_params, 3 }, { "TONE", tone_params, 2 },
+    { "CHORUS", cho_params, 4 }, { "FLANGER", fl_params, 4 },
+    { "TREMOLO", trem_params, 2 }, { "DELAY", dly_params, 3 },
+    { "SYN-MIX", syn_mix_params, 3 }, { "SYN-VOICE", syn_voice_params, 3 }
+};
+
+static const int NUM_SCREENS = (int)(sizeof(screens) / sizeof(screens[0]));
+static int g_screen;
+static enc_map_t enc_map[NUM_ENCODERS] = {
+    { ROLE_PARAM, 0 }, { ROLE_PARAM, 1 }, { ROLE_PARAM, 2 },
+    { ROLE_PARAM, 3 }, { ROLE_PARAM, 4 }, { ROLE_PARAM, 5 }
+};
 
 static float clampf(float value, float low, float high) {
     return value < low ? low : (value > high ? high : value);
@@ -137,7 +363,6 @@ static void write_tone(const params_t *p) {
     fx_hw_write(FX_BASE, FX_REG_TONE_H_A2, double_to_q2_30(a[1]));
 }
 
-/* Shelf suave: graves sin realce y agudos ajustables, centro en 3 kHz. */
 static void write_eq(const params_t *p) {
     static const u32 coef[7][5] = {
         { 0x40000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u }, /* +0 dB */
@@ -146,7 +371,7 @@ static void write_eq(const params_t *p) {
         { 0x555AA7BEu, 0xC31EC309u, 0x00000000u, 0xD8796AC7u, 0x00000000u }, /* +3 dB */
         { 0x5DEFC338u, 0xBBB28E22u, 0x00000000u, 0xD9A25159u, 0x00000000u }, /* +4 dB */
         { 0x675E146Fu, 0xB3778FA2u, 0x00000000u, 0xDAD5A411u, 0x00000000u }, /* +5 dB */
-        { 0x71B9B2F8u, 0xAA59B5BDu, 0x00000000u, 0xDC1368B5u, 0x00000000u } /* +6 dB */
+        { 0x71B9B2F8u, 0xAA59B5BDu, 0x00000000u, 0xDC1368B5u, 0x00000000u }  /* +6 dB */
     };
     int db = p->eq_agudos_db;
     if (db < 0) db = 0;
@@ -158,7 +383,6 @@ static void write_eq(const params_t *p) {
     fx_hw_write(FX_BASE, FX_REG_EQ_A2, coef[db][4]);
 }
 
-/* Redondeo y limite antes de convertir a entero. */
 static u32 synth_fixed(double value, unsigned fractional_bits) {
     double scaled = ldexp(value, (int)fractional_bits);
     scaled = scaled < 0.0 ? ceil(scaled - 0.5) : floor(scaled + 0.5);
@@ -177,17 +401,13 @@ static u32 synth_env_coefficient(float time_ms) {
 }
 
 static void write_synth_filter(const params_t *p) {
-    double fc = clampf(p->syn_cutoff_hz, 20.0f, 12000.0f);
+    int corte = p->syn_corte_mult < 0 ? 0 : p->syn_corte_mult > 16 ? 16 : p->syn_corte_mult;
+    double contorno = clampf(p->syn_contorno, 0.0f, 1.0f);
     double q = clampf(p->syn_resonance_q, 0.50f, 10.0f);
-    double g = tan(M_PI * fc / FS_HZ), k = 1.0 / q;
-    double a1 = 1.0 / (1.0 + g * (g + k));
-    u32 ctrl = p->syn_filter_mode >= 1 && p->syn_filter_mode <= 3
-             ? 1u | ((u32)(p->syn_filter_mode - 1) << 1) : 0u;
-    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_CTRL, ctrl);
-    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_A1, synth_fixed(a1, 31));
-    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_A2, synth_fixed(g * a1, 31));
-    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_A3, synth_fixed(g * g * a1, 31));
-    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_K, synth_fixed(k, 29));
+    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_CTRL, corte > 0 ? 1u : 0u);
+    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_TRACK,   synth_fixed((double)corte, 27));
+    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_CONTOUR, synth_fixed(4.0 * contorno, 29));
+    fx_hw_write(FX_BASE, FX_REG_SYNTH_SVF_K,       synth_fixed(1.0 / q, 29));
 }
 
 static void write_synth(const params_t *p) {
@@ -207,11 +427,11 @@ static void write_synth(const params_t *p) {
     fx_hw_write(FX_BASE, FX_REG_SYNTH_BUS_TRIM, float_to_q1_31(p->syn_bus_trim));
     fx_hw_write(FX_BASE, FX_REG_ENV_GAIN, float_to_q1_31(p->syn_env_gain));
     fx_hw_write(FX_BASE, FX_REG_FRONTEND_CTRL, FX_FRONTEND_PITCH | FX_FRONTEND_ENVELOPE);
-    fx_hw_write(FX_BASE, FX_REG_ENV_ATTACK, synth_env_coefficient(p->syn_attack_ms));
+    fx_hw_write(FX_BASE, FX_REG_ENV_ATTACK,  synth_env_coefficient(p->syn_attack_ms));
     fx_hw_write(FX_BASE, FX_REG_ENV_RELEASE, synth_env_coefficient(p->syn_release_ms));
-    double gate_on = clampf(p->syn_gate_on, 0.001f, 0.100f);
+    double gate_on  = clampf(p->syn_gate_on,  0.001f, 0.100f);
     double gate_off = clampf(p->syn_gate_off, 0.0f, (float)(gate_on - 0.001));
-    fx_hw_write(FX_BASE, FX_REG_GATE_ON_THR, synth_fixed(gate_on, 29));
+    fx_hw_write(FX_BASE, FX_REG_GATE_ON_THR,  synth_fixed(gate_on,  29));
     fx_hw_write(FX_BASE, FX_REG_GATE_OFF_THR, synth_fixed(gate_off, 29));
     fx_hw_write(FX_BASE, FX_REG_PITCH_CTRL,
                 p->syn_instrumento == 1 ? FX_PITCH_CTRL_THEREMIN : FX_PITCH_CTRL_GUITARRA);
@@ -232,7 +452,6 @@ void params_init(params_t *p) {
     p->fl_center = 3.0f; p->fl_depth = 2.0f; p->fl_rate = 0.4f; p->fl_fb = 0.5f; p->fl_wet = 0.5f;
     p->trem_rate = 5.0f; p->trem_depth = 0.5f;
     p->dly_time = 300.0f; p->dly_fb = 0.4f; p->dly_wet = 0.5f; p->dly_tone_hz = 3000.0f; p->dly_lpf_on = 1;
-    /* Phaser: mismos valores que el reset del RTL (1 Hz, 300-1600 Hz, FB 0.3) */
     p->ph_rate = 1.0f; p->ph_fmin = 300.0f; p->ph_fmax = 1600.0f; p->ph_fb = 0.3f;
     p->syn_osc1_mode = FX_OSC1_SAW_UP; p->syn_osc2_wave = FX_OSC2_SAW_UP;
     p->syn_osc1_range = FX_RANGE_8; p->syn_osc2_range = FX_RANGE_8; p->syn_harmonics = 1;
@@ -241,10 +460,35 @@ void params_init(params_t *p) {
     p->syn_bus_trim = 0.35f; p->syn_env_gain = 0.5f; p->syn_level = 0.9f;
     p->syn_pw1 = 0.5f; p->syn_pw2 = 0.5f;
     p->syn_output = FX_SYNTH_OUTPUT_MIX;
-    p->syn_filter_mode = 0; p->syn_cutoff_hz = 1000.0f; p->syn_resonance_q = 0.71f;
+    p->syn_corte_mult = 4; p->syn_contorno = 0.0f; p->syn_resonance_q = 0.71f;
     p->syn_attack_ms = 1.0f; p->syn_release_ms = 20.0f;
     p->syn_gate_on = 0.010f; p->syn_gate_off = 0.001f;
     p->syn_instrumento = 0;
+
+    dist_params[0] = (param_binding_t){ "Drive(%)", &p->dist_drive, 0.0f, 100.0f, 5.0f };
+    dist_params[1] = (param_binding_t){ "Level", &p->dist_level, 0.0f, 1.0f, 0.05f };
+    dist_params[2] = (param_binding_t){ "Tone", &p->dist_tone, 0.0f, 1.0f, 0.05f };
+    tone_params[0] = (param_binding_t){ "fLPF", &p->tone_lpf_hz, 200.0f, 7000.0f, 50.0f };
+    tone_params[1] = (param_binding_t){ "fHPF", &p->tone_hpf_hz, 300.0f, 5000.0f, 50.0f };
+    cho_params[0] = (param_binding_t){ "Center", &p->cho_center, 5.0f, 30.0f, 1.0f };
+    cho_params[1] = (param_binding_t){ "Depth", &p->cho_depth, 0.0f, 8.0f, 0.5f };
+    cho_params[2] = (param_binding_t){ "Rate", &p->cho_rate, 0.05f, 5.0f, 0.1f };
+    cho_params[3] = (param_binding_t){ "Wet", &p->cho_wet, 0.0f, 1.0f, 0.05f };
+    fl_params[0] = (param_binding_t){ "Depth", &p->fl_depth, 0.0f, 2.5f, 0.25f };
+    fl_params[1] = (param_binding_t){ "Rate", &p->fl_rate, 0.05f, 3.0f, 0.1f };
+    fl_params[2] = (param_binding_t){ "FB", &p->fl_fb, -0.9f, 0.9f, 0.05f };
+    fl_params[3] = (param_binding_t){ "Wet", &p->fl_wet, 0.0f, 1.0f, 0.05f };
+    trem_params[0] = (param_binding_t){ "Rate", &p->trem_rate, 0.5f, 15.0f, 0.5f };
+    trem_params[1] = (param_binding_t){ "Depth", &p->trem_depth, 0.0f, 1.0f, 0.05f };
+    dly_params[0] = (param_binding_t){ "Time", &p->dly_time, 20.0f, 600.0f, 10.0f };
+    dly_params[1] = (param_binding_t){ "FB", &p->dly_fb, 0.0f, 0.95f, 0.05f };
+    dly_params[2] = (param_binding_t){ "Wet", &p->dly_wet, 0.0f, 1.0f, 0.05f };
+    syn_mix_params[0] = (param_binding_t){ "OSC1", &p->syn_l1, 0.0f, 1.0f, 0.05f };
+    syn_mix_params[1] = (param_binding_t){ "OSC2", &p->syn_l2, 0.0f, 1.0f, 0.05f };
+    syn_mix_params[2] = (param_binding_t){ "Master", &p->syn_level, 0.0f, 1.0f, 0.05f };
+    syn_voice_params[0] = (param_binding_t){ "Tune2", &p->syn_o2_cents, -100.0f, 100.0f, 1.0f };
+    syn_voice_params[1] = (param_binding_t){ "Env", &p->syn_env_gain, 0.0f, 1.0f, 0.05f };
+    syn_voice_params[2] = (param_binding_t){ "Nivel synth", &p->syn_bus_trim, 0.01f, 1.0f, 0.01f };
 }
 
 void params_push_tone(const params_t *p) { write_tone(p); fx_hw_commit(FX_BASE); }
@@ -256,29 +500,28 @@ void params_push_to_pl(const params_t *p) {
     write_tone(p);
     fx_hw_write(FX_BASE, FX_REG_CHORUS_CTRL, 1u);
     fx_hw_write(FX_BASE, FX_REG_CHORUS_CENTER, ms_to_samples_q16_16(p->cho_center));
-    fx_hw_write(FX_BASE, FX_REG_CHORUS_DEPTH, ms_to_samples_q16_16(p->cho_depth));
-    fx_hw_write(FX_BASE, FX_REG_CHORUS_RATE, hz_to_phase_inc(p->cho_rate));
-    fx_hw_write(FX_BASE, FX_REG_CHORUS_WET, float_to_q1_31(p->cho_wet));
-    fx_hw_write(FX_BASE, FX_REG_CHORUS_LPF_G, cutoff_to_tpt_g(5000.0f));
-    fx_hw_write(FX_BASE, FX_REG_FLANGER_CTRL, 0u);
+    fx_hw_write(FX_BASE, FX_REG_CHORUS_DEPTH,  ms_to_samples_q16_16(p->cho_depth));
+    fx_hw_write(FX_BASE, FX_REG_CHORUS_RATE,   hz_to_phase_inc(p->cho_rate));
+    fx_hw_write(FX_BASE, FX_REG_CHORUS_WET,    float_to_q1_31(p->cho_wet));
+    fx_hw_write(FX_BASE, FX_REG_CHORUS_LPF_G,  cutoff_to_tpt_g(5000.0f));
+    fx_hw_write(FX_BASE, FX_REG_FLANGER_CTRL,   0u);
     fx_hw_write(FX_BASE, FX_REG_FLANGER_CENTER, ms_to_samples_q16_16(p->fl_center));
-    fx_hw_write(FX_BASE, FX_REG_FLANGER_DEPTH, ms_to_samples_q16_16(p->fl_depth));
-    fx_hw_write(FX_BASE, FX_REG_FLANGER_RATE, hz_to_phase_inc(p->fl_rate));
-    fx_hw_write(FX_BASE, FX_REG_FLANGER_FB, float_to_q1_31(p->fl_fb));
-    fx_hw_write(FX_BASE, FX_REG_FLANGER_WET, float_to_q1_31(p->fl_wet));
-    fx_hw_write(FX_BASE, FX_REG_TREMOLO_CTRL, 0u);
-    fx_hw_write(FX_BASE, FX_REG_TREMOLO_RATE, hz_to_phase_inc(p->trem_rate));
+    fx_hw_write(FX_BASE, FX_REG_FLANGER_DEPTH,  ms_to_samples_q16_16(p->fl_depth));
+    fx_hw_write(FX_BASE, FX_REG_FLANGER_RATE,   hz_to_phase_inc(p->fl_rate));
+    fx_hw_write(FX_BASE, FX_REG_FLANGER_FB,     float_to_q1_31(p->fl_fb));
+    fx_hw_write(FX_BASE, FX_REG_FLANGER_WET,    float_to_q1_31(p->fl_wet));
+    fx_hw_write(FX_BASE, FX_REG_TREMOLO_CTRL,  0u);
+    fx_hw_write(FX_BASE, FX_REG_TREMOLO_RATE,  hz_to_phase_inc(p->trem_rate));
     fx_hw_write(FX_BASE, FX_REG_TREMOLO_DEPTH, float_to_q1_31(p->trem_depth));
-    /* Phaser: G = g/(1+g), g = tan(pi*fc/fs) (TPT, ver fx_phaser.sv) */
     fx_hw_write(FX_BASE, FX_REG_PHASER_CTRL, 0u);
     fx_hw_write(FX_BASE, FX_REG_PHASER_RATE, hz_to_phase_inc(p->ph_rate));
     fx_hw_write(FX_BASE, FX_REG_PHASER_GMIN, cutoff_to_tpt_g(p->ph_fmin));
     fx_hw_write(FX_BASE, FX_REG_PHASER_GMAX, cutoff_to_tpt_g(p->ph_fmax));
-    fx_hw_write(FX_BASE, FX_REG_PHASER_FB, float_to_q1_31(p->ph_fb));
+    fx_hw_write(FX_BASE, FX_REG_PHASER_FB,   float_to_q1_31(p->ph_fb));
     fx_hw_write(FX_BASE, FX_REG_DELAY_CTRL, p->dly_lpf_on ? 1u : 0u);
     fx_hw_write(FX_BASE, FX_REG_DELAY_TIME, ms_to_samples_q16_16(p->dly_time));
-    fx_hw_write(FX_BASE, FX_REG_DELAY_FB, float_to_q1_31(p->dly_fb));
-    fx_hw_write(FX_BASE, FX_REG_DELAY_WET, float_to_q1_31(p->dly_wet));
+    fx_hw_write(FX_BASE, FX_REG_DELAY_FB,   float_to_q1_31(p->dly_fb));
+    fx_hw_write(FX_BASE, FX_REG_DELAY_WET,  float_to_q1_31(p->dly_wet));
     fx_hw_write(FX_BASE, FX_REG_DELAY_LPF_G, cutoff_to_tpt_g(p->dly_tone_hz));
     write_synth(p);
     fx_hw_commit(FX_BASE);
@@ -291,7 +534,7 @@ void params_master_enable(int on) {
 
 void params_set_mode(int synth_on, int tracking_on, int delay_on) {
     u32 fx_enable = fx_hw_read(FX_BASE, FX_REG_FX_ENABLE);
-    (void)tracking_on; // La voz siempre sigue pitch y envolvente.
+    (void)tracking_on;
     u32 frontend = FX_FRONTEND_PITCH | FX_FRONTEND_ENVELOPE;
     fx_hw_write(FX_BASE, FX_REG_SOURCE_CTRL, synth_on ? FX_SOURCE_SYNTH : 0u);
     fx_hw_write(FX_BASE, FX_REG_FRONTEND_CTRL, frontend);
@@ -327,6 +570,41 @@ void params_preset_tone(params_t *p, int idx) {
     params_push_tone(p);
 }
 
+void params_screen_next(void) { g_screen = (g_screen + 1) % NUM_SCREENS; }
+void params_screen_prev(void) { g_screen = (g_screen - 1 + NUM_SCREENS) % NUM_SCREENS; }
+const char *params_screen_title(void) { return screens[g_screen].title; }
+
+static void edit_param(int index, int delta) {
+    screen_def_t *screen = &screens[g_screen];
+    param_binding_t *binding;
+    if (index < 0 || index >= screen->n) return;
+    binding = &screen->params[index];
+    *binding->value = clampf(*binding->value + (float)delta * binding->step, binding->min, binding->max);
+}
+
+void params_handle_encoder(params_t *p, int enc, int delta) {
+    enc_map_t map;
+    if (delta == 0 || enc < 0 || enc >= NUM_ENCODERS) return;
+    map = enc_map[enc];
+    if (map.role == ROLE_PARAM) edit_param(map.param_idx, delta);
+    else if (map.role == ROLE_NAV_NEXT) delta > 0 ? params_screen_next() : params_screen_prev();
+    else delta > 0 ? params_screen_prev() : params_screen_next();
+    params_push_to_pl(p);
+}
+
+void params_print(const params_t *p) {
+    int i;
+    screen_def_t *screen = &screens[g_screen];
+    (void)p;
+    xil_printf("[%s]", screen->title);
+    for (i = 0; i < screen->n; ++i) {
+        int integer = (int)(*screen->params[i].value);
+        int decimal = (int)((*screen->params[i].value - (float)integer) * 100.0f);
+        if (decimal < 0) decimal = -decimal;
+        xil_printf(" %s=%d.%02d", screen->params[i].name, integer, decimal);
+    }
+    xil_printf("\r\n");
+}
 
 void synth_cycle_wave(params_t *p, int osc) {
     if (osc == 1) p->syn_osc1_mode = (p->syn_osc1_mode + 1) % 4;
@@ -350,206 +628,4 @@ const char *synth_wave_name(int osc, int wave) {
     return "invalid";
 }
 
-/* -------------------------------------------------------------------------
- * Driver de Overdrive / Distorsion (modelado no lineal Yeh y filtros TPT)
- * ------------------------------------------------------------------------- */
-#define FX_OD_INPUT_SENSITIVITY 1.7
-#define OD_PI 3.14159265358979323846
-#define OD_FS 48000.0
-#define OD_TABLE_CHUNK 128u
-#define OD_DRIVE_SETTLE_MS 60u
-#define OD_COMMIT_TIMEOUT_MS 1000u
-
-enum { OD_IDLE, OD_LOADING, OD_COMMIT };
-typedef struct { double drive, tone, level; } od_parameters_t;
-static od_parameters_t wanted;
-static u32 revision, applied_revision, pending_revision;
-static u32 load_index, load_bank, pending_bank, commit_ms, drive_changed_ms;
-static unsigned factor;
-static double load_drive, seen_drive, bank_drive[2];
-static int state, checked, failed, bank_valid[2], have_applied;
-
-static double limit(double x, double low, double high) {
-    return x < low ? low : (x > high ? high : x);
-}
-
-static int quantize(double x, int fractional_bits, u32 *word) {
-    double scaled = ldexp(x, fractional_bits);
-    double rounded;
-    if (!isfinite(scaled)) return -1;
-    rounded = scaled < 0.0 ? -floor(-scaled + 0.5) : floor(scaled + 0.5);
-    if (rounded < -2147483648.0 || rounded > 2147483647.0) return -1;
-    *word = (u32)(s32)rounded;
-    return 0;
-}
-
-static int fx_od_coefficients(double drive, double tone, double level, unsigned os_factor,
-                              double sensitivity, u32 words[12]) {
-    double fs, r2, wz, wc, rl, rr, parallel, y, w, wp, x, k;
-    double b1, b0, a1, a0, c, den;
-    double coeff[12];
-    static const int bits[12] = {31,31,31,31,23,30,30,30,30,30,31,29};
-    if (!words || !isfinite(drive) || !isfinite(tone) || !isfinite(level) ||
-        !isfinite(sensitivity) || drive < 0.0 || drive > 1.0 ||
-        tone < 0.0 || tone > 1.0 || level < 0.0 || level >= 4.0 ||
-        sensitivity <= 0.0 || (os_factor != 2 && os_factor != 4 && os_factor != 8)) return -1;
-    fs = OD_FS * os_factor;
-    r2 = 51000.0 + 500000.0 * drive;
-    wz = 1.0 / (4700.0 * 47e-9);
-    wc = 1.0 / (r2 * 51e-12);
-    coeff[0] = (2.0 * OD_PI * 15.9) / (2.0 * OD_FS + 2.0 * OD_PI * 15.9);
-    coeff[1] = (2.0 * OD_PI * 15.6) / (2.0 * OD_FS + 2.0 * OD_PI * 15.6);
-    coeff[2] = wz / (2.0 * fs + wz);
-    coeff[3] = wc / (2.0 * fs + wc);
-    coeff[4] = (r2 / 4700.0) * sensitivity;
-
-    rl = 20000.0 * tone; rr = 20000.0 * (1.0 - tone);
-    parallel = rl * rr / (rl + rr);
-    y = (rl + rr) * (220.0 + parallel);
-    w = y / (rl * 1000.0 + y);
-    wz = 1.0 / (0.22e-6 * (220.0 + parallel));
-    wp = 1.0 / (0.22e-6 * (1000.0 * 10000.0 / 11000.0));
-    x = rr / (rl + rr) * wz;
-    k = (rl * 1000.0 + y) / (y * 1000.0 * 0.22e-6);
-    b1 = k; b0 = k * w * wz; a1 = wp + wz + x; a0 = wp * wz;
-    c = 2.0 * fs; den = a0 + a1 * c + c * c;
-    coeff[5] = (b0 + b1 * c) / den;
-    coeff[6] = 2.0 * b0 / den;
-    coeff[7] = (b0 - b1 * c) / den;
-    coeff[8] = (2.0 * a0 - 2.0 * c * c) / den;
-    coeff[9] = (a0 - a1 * c + c * c) / den;
-    wc = 1.0 / 0.101;
-    coeff[10] = wc / (2.0 * fs + wc);
-    coeff[11] = level;
-    for (unsigned i = 0; i < 12; ++i)
-        if (quantize(coeff[i], bits[i], &words[i]) != 0) return -1;
-    a1 = (double)(s32)words[8] / 1073741824.0;
-    a0 = (double)(s32)words[9] / 1073741824.0;
-    if (fabs(a0) >= 1.0 || 1.0 + a1 + a0 <= 0.0 || 1.0 - a1 + a0 <= 0.0) return -1;
-    return 0;
-}
-
-static int fx_od_table_word(u32 index, double drive, double sensitivity, u32 *word) {
-    double u, r2, diode_c, lo, hi, v, f, candidate, exponential, inv;
-    const double vt = 1.752 * 0.02585;
-    u32 node;
-    if (!word || index >= FX_OD_TABLE_DEPTH || !isfinite(drive) ||
-        !isfinite(sensitivity) || drive < 0.0 || drive > 1.0 || sensitivity <= 0.0) return -1;
-    if (index < 128u) node = index << 5;
-    else if (index == 2560u) node = 0x80000000u;
-    else {
-        unsigned exponent = 12u + (index - 128u) / 128u;
-        node = (1u << exponent) + ((index & 127u) << (exponent - 7u));
-    }
-    u = (double)node / 1048576.0;
-    if (u == 0.0) { *word = 0; return 0; }
-    r2 = 51000.0 + 500000.0 * drive;
-    diode_c = 2.0 * r2 * 2.52e-9;
-    lo = 0.0; hi = fmin(u, vt * asinh(u / diode_c)); v = hi;
-    for (unsigned i = 0; i < 80; ++i) {
-        exponential = exp(v / vt); inv = 1.0 / exponential;
-        f = v + 0.5 * diode_c * (exponential - inv) - u;
-        if (fabs(f) <= 1e-12 + 16.0 * DBL_EPSILON * u)
-            return quantize(v / sensitivity, 29, word);
-        if (f < 0.0) lo = v; else hi = v;
-        candidate = v - f / (1.0 + 0.5 * diode_c / vt * (exponential + inv));
-        v = candidate >= lo && candidate <= hi ? candidate : 0.5 * (lo + hi);
-    }
-    return -1;
-}
-
-void fx_od_init(void) {
-    memset(&wanted, 0, sizeof(wanted));
-    revision = applied_revision = pending_revision = 0;
-    load_index = load_bank = pending_bank = commit_ms = drive_changed_ms = 0;
-    factor = 0; seen_drive = -1.0; load_drive = 0.0;
-    state = OD_IDLE; checked = failed = have_applied = 0;
-    bank_valid[0] = bank_valid[1] = 0;
-}
-
-void fx_od_request(float drive_percent, float tone, float level) {
-    od_parameters_t next;
-    if (!isfinite(drive_percent) || !isfinite(tone) || !isfinite(level)) return;
-    next.drive = limit((double)drive_percent / 100.0, 0.0, 1.0);
-    next.tone = limit((double)tone, 0.0, 1.0);
-    next.level = limit((double)level, 0.0, 1.0);
-    if (revision && wanted.drive == next.drive && wanted.tone == next.tone && wanted.level == next.level) return;
-    wanted = next; ++revision;
-}
-
-static void od_fail(int code) {
-    failed = 1;
-    xil_printf("[OD] Error %d: revisar VERSION, OD_STATUS y commit.\r\n", code);
-}
-
-static void od_apply(UINTPTR base, u32 bank, u32 now_ms) {
-    u32 words[12];
-    if (fx_od_coefficients(wanted.drive, wanted.tone, wanted.level, factor,
-                           FX_OD_INPUT_SENSITIVITY, words) != 0) { od_fail(4); return; }
-    for (u32 i = 0; i < 12; ++i) fx_hw_write(base, FX_REG_OD_INPUT1_G + 4u * i, words[i]);
-    fx_hw_write(base, FX_REG_OD_CTRL, bank);
-    pending_bank = bank; pending_revision = revision; commit_ms = now_ms;
-    fx_hw_commit(base); state = OD_COMMIT;
-}
-
-void fx_od_service(UINTPTR base, u32 now_ms) {
-    u32 status, active, info, word, count;
-    if (!revision || failed) return;
-    if (!checked) {
-        info = fx_hw_read(base, FX_REG_OD_INFO);
-        factor = info & 0xFFu;
-        if (!fx_hw_probe(base) || (info >> 16) != FX_OD_TABLE_DEPTH ||
-            (factor != 2 && factor != 4 && factor != 8)) { od_fail(1); return; }
-        checked = 1;
-    }
-    if (wanted.drive != seen_drive) { seen_drive = wanted.drive; drive_changed_ms = now_ms; }
-    if (state == OD_COMMIT) {
-        if (fx_hw_read(base, FX_REG_CORE_STATUS) & 2u) {
-            if ((u32)(now_ms - commit_ms) > OD_COMMIT_TIMEOUT_MS) od_fail(2);
-            return;
-        }
-        status = fx_hw_read(base, FX_REG_OD_STATUS);
-        if (((status >> 1) & 1u) != pending_bank || !(status & (FX_OD_STATUS_LOADED0 << pending_bank))) {
-            od_fail(3); return;
-        }
-        applied_revision = pending_revision;
-        state = OD_IDLE;
-        if (!have_applied) xil_printf("[OD] Listo: Yeh, %ux, tabla %u puntos.\r\n", factor, FX_OD_TABLE_DEPTH);
-        have_applied = 1;
-        return;
-    }
-    if (state == OD_LOADING && load_drive != wanted.drive) state = OD_IDLE;
-    if (fx_hw_read(base, FX_REG_CORE_STATUS) & 2u) return;
-    if (state == OD_IDLE) {
-        if (applied_revision == revision) return;
-        status = fx_hw_read(base, FX_REG_OD_STATUS);
-        active = (status >> 1) & 1u;
-        for (u32 i = 0; i < 2; ++i)
-            if (!(status & (FX_OD_STATUS_LOADED0 << i))) bank_valid[i] = 0;
-        if (bank_valid[active] && bank_drive[active] == wanted.drive) { od_apply(base, active, now_ms); return; }
-        if (have_applied && (u32)(now_ms - drive_changed_ms) < OD_DRIVE_SETTLE_MS) return;
-        load_bank = active ^ 1u;
-        if (bank_valid[load_bank] && bank_drive[load_bank] == wanted.drive) { od_apply(base, load_bank, now_ms); return; }
-        load_drive = wanted.drive; load_index = 0; bank_valid[load_bank] = 0;
-        fx_hw_write(base, FX_REG_OD_COMMAND, FX_OD_COMMAND_CLEAR);
-        fx_hw_write(base, FX_REG_DIST_WT_ADDR, FX_OD_WT_ADDR(load_bank, 0));
-        state = OD_LOADING;
-    }
-    if (state != OD_LOADING) return;
-    for (count = 0; count < OD_TABLE_CHUNK && load_index < FX_OD_TABLE_DEPTH; ++count, ++load_index) {
-        if (fx_od_table_word(load_index, load_drive, FX_OD_INPUT_SENSITIVITY, &word) != 0) { od_fail(5); return; }
-        fx_hw_write(base, FX_REG_DIST_WT_DATA, word);
-    }
-    status = fx_hw_read(base, FX_REG_OD_STATUS);
-    if (status & FX_OD_STATUS_REJECTED) { od_fail(6); return; }
-    if (load_index == FX_OD_TABLE_DEPTH) {
-        if (!(status & (FX_OD_STATUS_LOADED0 << load_bank))) { od_fail(7); return; }
-        bank_valid[load_bank] = 1; bank_drive[load_bank] = load_drive;
-        od_apply(base, load_bank, now_ms);
-    }
-}
-
-void params_service(u32 now_ms) {
-    fx_od_service(FX_BASE, now_ms);
-}
-
+void params_service(u32 now_ms) { fx_od_service(FX_BASE, now_ms); }

@@ -40,9 +40,8 @@ static int16_t enc_delta(int n) {
     if (n < 0 || n >= 6) return 0;
     int16_t now = (int16_t)(Xil_In32(FX_BASE + FX_REG_ENCODER(n)) & 0xFFFFu);
     int16_t d   = (int16_t)(now - enc_prev[n]);
-    if (d > -2 && d < 2) return 0;
     enc_prev[n] = now;
-    return (d / 2);
+    return d;
 }
 
 static int enc_button_clicked(int n, int switches) {
@@ -83,17 +82,10 @@ static u32 stack_max_used(void) {
     return (u32)(&_stack - (u8 *)p);
 }
 
-uint32_t lvgl_time_get(void) {
-    static uint32_t sw_ms = 0;
-    XTime t = 0;
+uint32_t lvgl_time_get(void){
+    XTime t;
     XTime_GetTime(&t);
-    uint32_t hw_ms = (uint32_t)((t * 1000ULL) / COUNTS_PER_SECOND);
-    if (hw_ms > sw_ms) {
-        sw_ms = hw_ms;
-    } else {
-        sw_ms += 5; // Fallback para garantizar que el tiempo NUNCA se congele en baremetal
-    }
-    return sw_ms;
+    return (uint32_t)((t * 1000) / COUNTS_PER_SECOND);
 }
 //CorrecciÃ³n color y flush renderizado
 void my_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_map) { 
@@ -106,31 +98,26 @@ void my_flush_cb(lv_display_t * display, const lv_area_t * area, uint8_t * px_ma
     lv_display_flush_ready(display);
 }
 
-// DESPERTADOR DEL NÚCLEO 1 
+// DESPERTADOR DEL NÃšCLEO 1 
 #define A9_CPU1_START_ADDR 0xFFFFFFF0
 static int WakeUpCore1(void) {
-    xil_printf("[BOOT] Despertando Core 1...\r\n");
 
     // PARCHE QSPI: 
-    // El FSBL deja al nucleo 1 en un bucle en 0xFFFFFF00
-    // Sobrescribimos ese bucle con un salto directo a 0x10000000
-    // 0xE51FF004 = 'ldr pc, [pc, #-4]' (Carga el PC con el valor que esta en 0xFFFFFF04)
+        // El FSBL deja al nucleo 1 en un bucle en 0xFFFFFF00
+        // Sobrescribimos ese bucle con un salto directo a 0x10000000
+        // 0xE51FF004 = 'ldr pc, [pc, #-4]' (Carga el PC con el valor que esta en 0xFFFFFF04)
     Xil_Out32(0xFFFFFF00, 0xE51FF004); 
     Xil_Out32(0xFFFFFF04, 0x10000000); 
 
     // Mantenemos el buzon original para cuando arrancamos por JTAG
     Xil_Out32(A9_CPU1_START_ADDR, 0x10000000);  
     dmb();
-    __asm__("sev"); // Instrucción en ensamblador SEV (Send Event)
-    
+    __asm__("sev"); // InstrucciÃ³n en ensamblador SEV (Send Event)
     uint32_t wait_ms = 0;
     while(IPC->core1_ready == 0 && wait_ms < 3000) {
         usleep(1000);
         wait_ms++;
     }
-    xil_printf("[BOOT] Core 1 status: %s (IPC->core1_ready=%u, esperó %u ms)\r\n",
-               (IPC->core1_ready != 0) ? "LISTO" : "TIMEOUT",
-               (unsigned int)IPC->core1_ready, (unsigned int)wait_ms);
     return IPC->core1_ready != 0;
 }
 
@@ -139,36 +126,29 @@ int main() {
 
     stack_paint();
 
-    // Deshabilitar cache para la región OCM (0xFFFF0000)
+    //Deshabilitar cache para la regiÃ³n OCM (0xFFFF0000)
     Xil_SetTlbAttributes(0xFFFF0000, 0x14de2);
 
-    // Init IPC
+    // La pantalla se prueba antes de acceder a cualquier perifÃ©rico del diseÃ±o.
+    if (ili9341_init() != 0) return XST_FAILURE;
+    ili9341_test_pattern();
+    usleep(800000);
+
+    //Init IPC
     IPC->hw_mode = 0;
     IPC->sd_recording = 0;
     IPC->loop_index = 0;
     IPC->loop_length = 0;
     IPC->core1_ready = 0;
-    IPC->preset_cmd = 0;
-    IPC->preset_status = 0;
+    IPC->preset_cmd = 0;      // la OCM arranca con basura: sin esto Core 1
+    IPC->preset_status = 0;   // puede ejecutar un SAVE/LOAD de preset fantasma
 
-    // Init GPIO
-    Status = XGpio_Initialize(&GpioPedal, GPIO_SW_DEV_ID);
-    if (Status == XST_SUCCESS) {
-        XGpio_SetDataDirection(&GpioPedal, 1, 0xFFFFFFFF);
-        gpio_ready = 1;
-    }
-    xil_printf("[BOOT] GPIO listo=%d (Status=%d)\r\n", gpio_ready, Status);
-
-    // Init Pantalla ILI9341
-    if (ili9341_init() != 0) return XST_FAILURE;
-
-    // Despertar Núcleo 1 ANTES de inicializar LVGL (orden probado de Entrega_Tesis)
-    WakeUpCore1();
-
-    // Init LVGL y Display
+    //Init LVGL y UI antes de arrancar el segundo nÃºcleo.
+    ili9341_fill_screen(COLOR_BLACK);
     lv_init();
     lv_tick_set_cb(lvgl_time_get);
 
+    // El controlador ya configura el ILI9341 en horizontal mediante MADCTL.
     lv_display_t * disp = lv_display_create(ILI9341_WIDTH, ILI9341_HEIGHT);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_flush_cb(disp, my_flush_cb);
@@ -181,22 +161,41 @@ int main() {
     xil_printf("FX core: ID=0x%08x VERSION=0x%08x\r\n",
                (unsigned int)core_id, (unsigned int)core_version);
 
-    xil_printf("[BOOT] Creando UI...\r\n");
+    if ((core_id != FX_CORE_ID_VALUE) || (core_version != FX_CORE_VERSION_VALUE)) {
+        ili9341_fill_screen(COLOR_RED);
+        while (1) { }
+    }
+
+    // Primero se crea y dibuja la interfaz, igual que en el proyecto estable.
     fx_od_init();
     ui_init();
+    // El temporizador de refresco de LVGL no vence inmediatamente. Se le da
+    // tiempo a completar el primer cuadro antes de continuar con el hardware.
+    for (int i = 0; i < 12; i++) {
+        lv_timer_handler();
+        usleep(5000);
+    }
 
-    // Hardware params y encoders
+    // Luego se inicializan los parametros del hardware.
     params_master_enable(1);
     params_load_wavetables();
     params_set_mode(0, 1, 0);
     encoders_init();
 
+    // Los controles no deben impedir que arranque la interfaz.
+    Status = XGpio_Initialize(&GpioPedal, GPIO_SW_DEV_ID);
+    if (Status == XST_SUCCESS) {
+        XGpio_SetDataDirection(&GpioPedal, 1, 0xFFFFFFFF);
+        gpio_ready = 1;
+    }
+
+    // El loop se inicia al final. Si Core 1 no responde, la UI sigue activa.
+    WakeUpCore1();
+
     u32 last_diag_sequence = IPC->diag_sequence;
 
     int switches_init = gpio_ready ? XGpio_DiscreteRead(&GpioPedal, 1) : 0xFFFFFFFF;
     int last_pedal = ((switches_init & 0x01) != 0) ? PRESIONADO : SOLTADO;
-    xil_printf("[BOOT] Switches iniciales: 0x%04x (pedal=%s)\r\n",
-               (unsigned int)switches_init, (last_pedal == PRESIONADO) ? "PRESIONADO" : "SOLTADO");
     
     static uint32_t pedal_debounce_time = 0;
     uint32_t record_command_start_ms = 0;
@@ -205,8 +204,6 @@ int main() {
     // Control grabado SD (SW1 en IO37 / Bit 7)
     static int sw1_prev = 0;
     static uint32_t sw1_debounce_time = 0;
-
-    xil_printf("[BOOT] ENTRANDO AL BUCLE PRINCIPAL (while 1)\r\n");
 
     while (1) {
         uint32_t now = lvgl_time_get();
@@ -254,6 +251,7 @@ int main() {
             last_diag_sequence = diag_sequence;
         }
 
+        // El footswitch 1 es normalmente cerrado: 0 = suelto, 1 = presionado
         int switches = gpio_ready ? XGpio_DiscreteRead(&GpioPedal, 1) : 0xFFFFFFFF;
         
         int pedal = ((switches & 0x01) != 0) ? PRESIONADO : SOLTADO;
@@ -301,8 +299,8 @@ int main() {
         loop_stop_prev = loop_stop_raw;
 
         ui_handle_presets(switches, now); // perfiles de efectos
+        ui_handle_page_switch((uint32_t)switches, now); // SW3: pagina de synth
         ui_update_status(IPC->hw_mode, (IPC->sd_recording == 1)); // estado loop y SD
-        
         uint32_t progress_length = (IPC->hw_mode == 1) ? LOOP_MAX_SAMPLES : IPC->loop_length;
         ui_update_progress(IPC->loop_index, progress_length); // progreso del loop
 
@@ -313,29 +311,15 @@ int main() {
         int e3_d = enc_delta(3);
         int e4_d = enc_delta(4);
         int e5_d = enc_delta(5);
-
         unsigned param_clicked = 0;
         for (int n = 0; n < 4; n++)
             if (enc_button_clicked(n, switches)) param_clicked |= 1u << n;
         int e4_clicked = enc_button_clicked(4, switches);
-        int e5_clicked = enc_button_clicked(5, switches);
-        int nav_clicked = e4_clicked | e5_clicked;
-
         ui_handle_buttons(param_clicked);
-        ui_handle_encoders(e0_d, e1_d, e2_d, e3_d, e4_d, nav_clicked, e5_d);
-
+        ui_handle_encoders(e0_d, e1_d, e2_d, e3_d, e4_d, e4_clicked, e5_d);
         params_service(now);
-        lv_timer_handler();
 
-        static uint32_t last_hb = 0;
-        static uint32_t loop_cycles = 0;
-        loop_cycles++;
-        if (loop_cycles == 1 || (now - last_hb >= 1000)) {
-            last_hb = now;
-            xil_printf("[HB] t=%u ms, loops=%u, sw=0x%04X, c1_rdy=%u\r\n",
-                       (unsigned int)now, (unsigned int)loop_cycles,
-                       (unsigned int)switches, (unsigned int)IPC->core1_ready);
-        }
+        lv_timer_handler();
 
         static uint32_t stack_report_time = 0;
         if (now - stack_report_time > 5000) {

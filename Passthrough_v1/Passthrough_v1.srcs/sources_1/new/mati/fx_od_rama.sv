@@ -1,12 +1,12 @@
 `timescale 1ns/1ps
-//! @title Rama de ganancia del overdrive
-//! @file fx_od_branch.sv
-//! @brief Pasaaltos y pasabajos TPT, seguidos por la ganancia de Drive.
-//!
-//! Por etapa: v = G*x - G*s; lp = s + v; s_next = s + 2*v.
-//! La primera entrega hp = x - lp; la segunda entrega lp.
-//! Entrada y estados Q3.29. Salida u en voltios virtuales Q11.21.
-//! Todavia no incluye los HPF de entrada, diodos, suma directa ni Tone.
+// fx_od_rama.sv
+// Rama de ganancia del overdrive: pasaaltos y pasabajos TPT, seguidos por la ganancia de Drive.
+//
+// Por etapa: v = G*x - G*s; lp = s + v; s_next = s + 2*v.
+// La primera entrega hp = x - lp; la segunda entrega lp.
+//
+// Entrada y estados Q3.29. Salida u en voltios virtuales Q11.21.
+// Todavia no incluye los HPF de entrada, diodos, suma directa ni Tone.
 
 module fx_od_rama(
     input  logic               clk,

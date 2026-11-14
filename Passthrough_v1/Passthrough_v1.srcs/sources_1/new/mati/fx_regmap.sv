@@ -252,12 +252,11 @@ always_ff @(posedge clk) begin
         o_synth_mix_cfg.noise_level_q1_31 <= 32'd0;
         o_synth_mix_cfg.bus_trim_q1_31 <= 32'h0666_6666; // 5%
 
-        // SVF: bypass, coefficients = 1 kHz / Q 0.707
+        // SVF: apagado, corte = 4 x nota, sin contorno, Q 0.707
         o_synth_svf_cfg.ctrl <= 32'd0;
-        o_synth_svf_cfg.a1_q1_31 <= 32'sh74AE_DF37;
-        o_synth_svf_cfg.a2_q1_31 <= 32'sh07A5_D723;
-        o_synth_svf_cfg.a3_q1_31 <= 32'sh0080_52DA;
-        o_synth_svf_cfg.k_q3_29  <= 32'sh2D41_3CCE;
+        o_synth_svf_cfg.track_q5_27   <= 32'sh2000_0000;
+        o_synth_svf_cfg.contour_q3_29 <= 32'sh0000_0000;
+        o_synth_svf_cfg.k_q3_29       <= 32'sh2D41_3CCE;
         o_synth_svf_cfg.drive <= 32'd0;
 
         o_synth_out_cfg.ctrl <= 32'd0;
@@ -674,28 +673,19 @@ always_ff @(posedge clk) begin
                             o_synth_svf_clear <= 1'b1;
                     end
 
-                    REG_SYNTH_SVF_A1:
-                        o_synth_svf_cfg.a1_q1_31 <= $signed(
+                    REG_SYNTH_SVF_TRACK:
+                        o_synth_svf_cfg.track_q5_27 <= $signed(
                             apply_wstrb(
-                                o_synth_svf_cfg.a1_q1_31,
+                                o_synth_svf_cfg.track_q5_27,
                                 wdata_r,
                                 wstrb_r
                             )
                         );
 
-                    REG_SYNTH_SVF_A2:
-                        o_synth_svf_cfg.a2_q1_31 <= $signed(
+                    REG_SYNTH_SVF_CONTOUR:
+                        o_synth_svf_cfg.contour_q3_29 <= $signed(
                             apply_wstrb(
-                                o_synth_svf_cfg.a2_q1_31,
-                                wdata_r,
-                                wstrb_r
-                            )
-                        );
-
-                    REG_SYNTH_SVF_A3:
-                        o_synth_svf_cfg.a3_q1_31 <= $signed(
-                            apply_wstrb(
-                                o_synth_svf_cfg.a3_q1_31,
+                                o_synth_svf_cfg.contour_q3_29,
                                 wdata_r,
                                 wstrb_r
                             )
@@ -1169,9 +1159,8 @@ always_comb begin
                 };
 
             REG_SYNTH_SVF_CTRL:  read_data_w = o_synth_svf_cfg.ctrl;
-            REG_SYNTH_SVF_A1:    read_data_w = o_synth_svf_cfg.a1_q1_31;
-            REG_SYNTH_SVF_A2:    read_data_w = o_synth_svf_cfg.a2_q1_31;
-            REG_SYNTH_SVF_A3:    read_data_w = o_synth_svf_cfg.a3_q1_31;
+            REG_SYNTH_SVF_TRACK:   read_data_w = o_synth_svf_cfg.track_q5_27;
+            REG_SYNTH_SVF_CONTOUR: read_data_w = o_synth_svf_cfg.contour_q3_29;
             REG_SYNTH_SVF_K:     read_data_w = o_synth_svf_cfg.k_q3_29;
             REG_SYNTH_SVF_DRIVE: read_data_w = o_synth_svf_cfg.drive;
 

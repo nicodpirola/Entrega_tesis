@@ -6,6 +6,7 @@
 #include "xil_io.h"
 #include "ipc.h"
 #include "fx_regmap.h"
+#include "cab_ir_bank.h"
 
 // LVGL objects
 static lv_obj_t * header_cont;
@@ -61,8 +62,8 @@ effect_module_t effects_list[MAX_EFFECTS] = {
             {"Modo Pitch",  0, 1,     0},
 
             // Pagina 1: Filtro SVF
-            {"Filtro",      0, 3,     1},
-            {"Cutoff(Hz)",  20, 12000, 1000},
+            {"Corte(xnota)", 0, 16,    4},
+            {"Contorno(%)",  0, 100,   0},
             {"Reson(Q*10)", 5, 50,    10},
             {"Salida Osc",  0, 2,     2},
 
@@ -198,8 +199,8 @@ static void ui_apply_all_params(void) {
     p.syn_o2_cents    = (float)effects_list[UI_SYNTH].params[2].current_val;
     p.syn_instrumento = effects_list[UI_SYNTH].params[3].current_val; // 0=Guitarra, 1=Theremin
 
-    p.syn_filter_mode = effects_list[UI_SYNTH].params[4].current_val;
-    p.syn_cutoff_hz   = (float)effects_list[UI_SYNTH].params[5].current_val;
+    p.syn_corte_mult  = effects_list[UI_SYNTH].params[4].current_val;
+    p.syn_contorno    = (float)effects_list[UI_SYNTH].params[5].current_val / 100.0f;
     p.syn_resonance_q = (float)effects_list[UI_SYNTH].params[6].current_val / 10.0f;
     p.syn_output      = effects_list[UI_SYNTH].params[7].current_val;
 
@@ -327,13 +328,8 @@ static void ui_refresh_param_panel(void) {
                     case 1: snprintf(buf, sizeof(buf), "%s: %s", pname, synth_wave_name(2, val)); break;
                     case 2: snprintf(buf, sizeof(buf), "%s: %d cnt", pname, val); break;
                     case 3: snprintf(buf, sizeof(buf), "%s: %s", pname, val ? "Theremin" : "Guitarra"); break;
-                    case 4: {
-                        const char *f_names[] = { "Bypass", "LowPass", "BandPass", "HighPass" };
-                        const char *fn = (val >= 0 && val < 4) ? f_names[val] : "Bypass";
-                        snprintf(buf, sizeof(buf), "%s: %s", pname, fn);
-                        break;
-                    }
-                    case 5: snprintf(buf, sizeof(buf), "%s: %d Hz", pname, val); break;
+                    case 4: snprintf(buf, sizeof(buf), "%s: %dx", pname, val); break;
+                    case 5: snprintf(buf, sizeof(buf), "%s: %d%%", pname, val); break;
                     case 6: snprintf(buf, sizeof(buf), "%s: %d.%d", pname, val / 10, val % 10); break;
                     case 7: {
                         const char *o_names[] = { "Solo Osc1", "Solo Osc2", "Mezcla" };
@@ -447,6 +443,11 @@ void ui_handle_presets(int switches, uint32_t now) {
             sw_slot_pressed[k] = 0;
         }
     }
+}
+
+void ui_handle_page_switch(uint32_t switches, uint32_t now) {
+    (void)switches;
+    (void)now;
 }
 
 void ui_init(void) {

@@ -42,5 +42,6 @@ void ui_handle_buttons(unsigned param_clicked);
 void ui_save_preset(int slot);
 void ui_load_preset(int slot);
 void ui_handle_presets(int switches, uint32_t now);
+void ui_handle_page_switch(uint32_t switches, uint32_t now);
 
 #endif

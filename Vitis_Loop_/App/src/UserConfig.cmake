@@ -30,6 +30,8 @@ set(USER_INCLUDE_DIRECTORIES
 "lvgl"
 "${CMAKE_CURRENT_SOURCE_DIR}"
 )
+# El calculo de tablas en params se optimiza sin cambiar el resto de la aplicacion.
+set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/params.c" PROPERTIES COMPILE_OPTIONS "-O2")
 set(USER_COMPILE_SOURCES
 "main.c"
 "ili9341.c"
